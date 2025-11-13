@@ -1,0 +1,31 @@
+provider_id,hpii,name_given,name_family,role,specialty,status
+1,8003614769851,Harper,Williams,General Practitioner,Psychiatry,active
+2,8003615896624,Riley,Moore,Psychologist,Pharmacy,inactive
+3,8003615089126,Kai,Moore,Psychiatrist,Clinical Psychology,active
+4,8003619526867,Elliot,Davis,Case Manager,Mental Health,inactive
+5,8003619518424,Harper,Martinez,Pharmacist,Mental Health,inactive
+6,8003619214801,Quinn,Thompson,Case Manager,Psychiatry,inactive
+7,8003617328534,Drew,Martinez,Psychiatrist,Pharmacy,active
+8,8003617425184,Jamie,Thompson,Case Manager,Psychiatry,active
+9,8003617395997,Charlie,Moore,Psychiatrist,General Practice,inactive
+10,8003619427047,Taylor,Jones,Psychologist,Pharmacy,active
+11,8003619823994,Jesse,Brown,Psychiatrist,Mental Health,active
+12,8003612255409,Harper,Jones,Psychiatrist,Pharmacy,inactive
+13,8003612347467,Parker,Taylor,Pharmacist,Clinical Psychology,inactive
+14,8003611602286,Charlie,Moore,Psychologist,Mental Health,active
+15,8003612516313,Quinn,Garcia,Psychiatrist,Mental Health,active
+16,8003616024207,Jesse,Miller,General Practitioner,Mental Health,inactive
+17,8003617014016,Taylor,Wilson,Pharmacist,Psychiatry,active
+18,8003617913081,Jamie,Martin,Psychologist,General Practice,active
+19,8003617418028,Cameron,Williams,Psychologist,General Practice,inactive
+20,8003614895475,Noah,Jones,Psychiatrist,Pharmacy,inactive
+21,8003618805654,Avery,Smith,Pharmacist,Clinical Psychology,active
+22,8003616797629,Jordan,Hernandez,Psychologist,Pharmacy,inactive
+23,8003616068760,Avery,Hernandez,Case Manager,Psychiatry,inactive
+24,8003617398231,Casey,Garcia,Psychologist,Pharmacy,inactive
+25,8003617640518,Quinn,Smith,Pharmacist,Mental Health,active
+26,8003615801541,Parker,Moore,Case Manager,Clinical Psychology,inactive
+27,8003615204819,Jamie,Davis,Case Manager,Mental Health,active
+28,8003611559763,Quinn,Hernandez,Psychologist,Pharmacy,active
+29,8003616481437,Jordan,Wilson,Psychiatrist,General Practice,active
+30,8003617138070,Riley,Jackson,Psychologist,Clinical Psychology,inactive

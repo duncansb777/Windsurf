@@ -1,0 +1,51 @@
+patient_id,mrn,ihi,given_name,family_name,dob,sex_at_birth,gender_identity,indigenous_status,address_line1,suburb,state,postcode,phone,email,deceased_bool
+1,MRN-1001,80036046913810,Casey,Smith,1971-12-21,female,female,Non-Indigenous,174 Example St,Manly,VIC,2300,+61 2 9532 13201,casey.smith@example.com,false
+2,MRN-1002,80036090801586,Jamie,Martin,1952-05-19,female,unknown,Aboriginal,115 Example St,Chatswood,SA,2000,+61 2 9877 92526,jamie.martin@example.com,false
+3,MRN-1003,80036038898923,Avery,Jones,1980-03-13,male,male,Aboriginal and Torres Strait Islander,25 Example St,Penrith,TAS,2300,+61 2 9370 92607,avery.jones@example.com,false
+4,MRN-1004,80036084093639,Elliot,Williams,1976-04-20,intersex,female,Non-Indigenous,12 Example St,Wollongong,SA,2007,+61 2 9975 33816,elliot.williams@example.com,false
+5,MRN-1005,80036031831063,Jesse,Anderson,1983-03-19,intersex,female,Torres Strait Islander,180 Example St,Parramatta,QLD,2500,+61 2 9846 35027,jesse.anderson@example.com,true
+6,MRN-1006,80036039476249,Avery,Jackson,1979-02-04,male,female,Non-Indigenous,81 Example St,Liverpool,SA,2007,+61 2 9316 68053,avery.jackson@example.com,true
+7,MRN-1007,80036029175900,Elliot,Hernandez,1973-10-06,female,female,Unknown,138 Example St,Gosford,ACT,2300,+61 2 9508 47032,elliot.hernandez@example.com,true
+8,MRN-1008,80036024716857,Jordan,Johnson,1963-09-18,female,unknown,Unknown,17 Example St,Liverpool,ACT,2300,+61 2 9579 64148,jordan.johnson@example.com,false
+9,MRN-1009,80036045812670,Casey,Jackson,2007-07-04,intersex,male,Torres Strait Islander,112 Example St,Newcastle,NT,2000,+61 2 9839 99648,casey.jackson@example.com,false
+10,MRN-1010,80036093926371,Logan,Brown,1976-10-10,female,female,Torres Strait Islander,196 Example St,Newcastle,NSW,2300,+61 2 9431 60001,logan.brown@example.com,false
+11,MRN-1011,80036017774584,Quinn,Garcia,1971-08-11,male,male,Aboriginal and Torres Strait Islander,18 Example St,Manly,QLD,2010,+61 2 9775 58682,quinn.garcia@example.com,false
+12,MRN-1012,80036066792612,Logan,White,1969-01-01,female,non-binary,Aboriginal and Torres Strait Islander,172 Example St,Penrith,NT,2500,+61 2 9562 22333,logan.white@example.com,false
+13,MRN-1013,80036088961459,Charlie,Smith,1999-09-11,female,female,Non-Indigenous,19 Example St,Sydney,WA,2007,+61 2 9132 98051,charlie.smith@example.com,false
+14,MRN-1014,80036038754377,Avery,Moore,1998-05-18,female,unknown,Aboriginal,122 Example St,Liverpool,WA,2007,+61 2 9199 77465,avery.moore@example.com,true
+15,MRN-1015,80036017270733,Harper,Hernandez,2010-05-30,male,male,Aboriginal and Torres Strait Islander,187 Example St,Penrith,VIC,2067,+61 2 9296 29487,harper.hernandez@example.com,false
+16,MRN-1016,80036047385696,Harper,Miller,1991-07-04,female,male,Aboriginal and Torres Strait Islander,141 Example St,Parramatta,NSW,2500,+61 2 9956 11513,harper.miller@example.com,false
+17,MRN-1017,80036074606833,Harper,Moore,1969-03-06,unknown,male,Aboriginal,98 Example St,Sydney,ACT,2095,+61 2 9902 90374,harper.moore@example.com,true
+18,MRN-1018,80036030776478,Micah,Moore,1967-01-14,intersex,female,Non-Indigenous,149 Example St,Manly,NSW,2150,+61 2 9158 15197,micah.moore@example.com,false
+19,MRN-1019,80036020752378,Taylor,Martin,1966-09-03,male,male,Aboriginal,104 Example St,Parramatta,WA,2300,+61 2 9708 14091,taylor.martin@example.com,true
+20,MRN-1020,80036080166708,Noah,Thompson,1978-05-20,intersex,female,Torres Strait Islander,62 Example St,Gosford,ACT,2010,+61 2 9787 76047,noah.thompson@example.com,false
+21,MRN-1021,80036071510041,Jordan,Smith,2005-09-23,male,male,Unknown,55 Example St,Manly,SA,2010,+61 2 9457 17035,jordan.smith@example.com,false
+22,MRN-1022,80036082909480,Cameron,Hernandez,1977-02-20,male,non-binary,Non-Indigenous,35 Example St,Gosford,VIC,2007,+61 2 9860 66624,cameron.hernandez@example.com,false
+23,MRN-1023,80036056020613,Parker,Davis,1968-04-07,intersex,unknown,Torres Strait Islander,14 Example St,Parramatta,ACT,2095,+61 2 9145 10352,parker.davis@example.com,false
+24,MRN-1024,80036084045292,Cameron,Hernandez,1988-05-15,male,male,Non-Indigenous,177 Example St,Newcastle,NSW,2150,+61 2 9696 66526,cameron.hernandez@example.com,false
+25,MRN-1025,80036058942697,Taylor,Wilson,1953-07-31,intersex,female,Aboriginal,171 Example St,Parramatta,TAS,2500,+61 2 9995 51692,taylor.wilson@example.com,false
+26,MRN-1026,80036065337219,Cameron,Miller,1952-03-23,female,non-binary,Aboriginal and Torres Strait Islander,172 Example St,Wollongong,SA,2010,+61 2 9906 81816,cameron.miller@example.com,false
+27,MRN-1027,80036036786211,Kai,Garcia,1991-04-19,intersex,non-binary,Aboriginal,58 Example St,Sydney,WA,2170,+61 2 9436 38514,kai.garcia@example.com,false
+28,MRN-1028,80036081969657,Logan,Taylor,1979-09-17,male,male,Torres Strait Islander,46 Example St,Chatswood,SA,2000,+61 2 9211 71065,logan.taylor@example.com,false
+29,MRN-1029,80036078642041,Harper,White,1960-05-17,unknown,female,Torres Strait Islander,12 Example St,Liverpool,NSW,2500,+61 2 9925 65135,harper.white@example.com,true
+30,MRN-1030,80036093638503,Jordan,Martinez,1978-03-01,male,non-binary,Unknown,80 Example St,Liverpool,TAS,2170,+61 2 9813 40282,jordan.martinez@example.com,false
+31,MRN-1031,80036033357554,Harper,Taylor,2005-03-22,intersex,unknown,Unknown,1 Example St,Gosford,SA,2067,+61 2 9540 90499,harper.taylor@example.com,false
+32,MRN-1032,80036069345683,Jesse,Hernandez,2010-08-12,female,unknown,Aboriginal,169 Example St,Parramatta,SA,2500,+61 2 9779 74895,jesse.hernandez@example.com,false
+33,MRN-1033,80036040150759,Jamie,Wilson,1967-11-13,female,male,Non-Indigenous,63 Example St,Bondi,VIC,2250,+61 2 9524 74493,jamie.wilson@example.com,true
+34,MRN-1034,80036042747037,Kai,Taylor,1963-03-29,male,male,Aboriginal and Torres Strait Islander,57 Example St,Newcastle,NT,2000,+61 2 9670 35517,kai.taylor@example.com,false
+35,MRN-1035,80036085017682,Jesse,Martin,2003-06-03,intersex,unknown,Unknown,185 Example St,Manly,ACT,2500,+61 2 9556 26277,jesse.martin@example.com,false
+36,MRN-1036,80036079967676,Jamie,Rodriguez,1993-06-23,female,non-binary,Aboriginal and Torres Strait Islander,20 Example St,Gosford,WA,2095,+61 2 9443 42781,jamie.rodriguez@example.com,false
+37,MRN-1037,80036061410126,Riley,Garcia,1963-09-17,female,male,Aboriginal and Torres Strait Islander,105 Example St,Penrith,NT,2170,+61 2 9163 31166,riley.garcia@example.com,false
+38,MRN-1038,80036074019136,Noah,Taylor,1950-07-13,intersex,non-binary,Aboriginal and Torres Strait Islander,108 Example St,Manly,WA,2250,+61 2 9324 37967,noah.taylor@example.com,false
+39,MRN-1039,80036099774697,Elliot,Martinez,2010-12-06,unknown,female,Aboriginal and Torres Strait Islander,33 Example St,Chatswood,NSW,2170,+61 2 9706 67701,elliot.martinez@example.com,true
+40,MRN-1040,80036034391257,Riley,Hernandez,1954-07-06,intersex,unknown,Torres Strait Islander,55 Example St,Bondi,TAS,2150,+61 2 9879 48846,riley.hernandez@example.com,false
+41,MRN-1041,80036012601580,Jordan,Moore,1998-05-24,male,non-binary,Aboriginal,167 Example St,Parramatta,NSW,2000,+61 2 9353 30409,jordan.moore@example.com,false
+42,MRN-1042,80036073560289,Jamie,Jones,2010-01-22,male,female,Aboriginal and Torres Strait Islander,180 Example St,Gosford,TAS,2010,+61 2 9720 72112,jamie.jones@example.com,false
+43,MRN-1043,80036013446499,Casey,Thompson,1977-12-27,unknown,unknown,Aboriginal,20 Example St,Chatswood,WA,2007,+61 2 9813 89149,casey.thompson@example.com,false
+44,MRN-1044,80036056600900,Noah,Johnson,1997-10-17,unknown,non-binary,Non-Indigenous,130 Example St,Penrith,NSW,2170,+61 2 9942 60116,noah.johnson@example.com,false
+45,MRN-1045,80036068450095,Jesse,Jones,1965-10-20,intersex,unknown,Aboriginal and Torres Strait Islander,112 Example St,Chatswood,SA,2150,+61 2 9972 35114,jesse.jones@example.com,true
+46,MRN-1046,80036086483924,Jamie,Hernandez,2004-10-03,unknown,non-binary,Non-Indigenous,127 Example St,Penrith,QLD,2250,+61 2 9317 46345,jamie.hernandez@example.com,false
+47,MRN-1047,80036084597009,Parker,Rodriguez,1950-11-29,female,male,Aboriginal,185 Example St,Liverpool,NT,2500,+61 2 9876 34677,parker.rodriguez@example.com,true
+48,MRN-1048,80036049491631,Alex,Williams,1969-11-18,unknown,female,Torres Strait Islander,170 Example St,Chatswood,TAS,2250,+61 2 9666 64356,alex.williams@example.com,false
+49,MRN-1049,80036046361787,Drew,Hernandez,1977-07-05,intersex,female,Non-Indigenous,185 Example St,Wollongong,TAS,2007,+61 2 9860 64823,drew.hernandez@example.com,false
+50,MRN-1050,80036089133014,Kai,Rodriguez,1997-01-25,intersex,male,Aboriginal,76 Example St,Wollongong,TAS,2010,+61 2 9409 11482,kai.rodriguez@example.com,false

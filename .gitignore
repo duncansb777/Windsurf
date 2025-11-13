@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node/Frontends (if added later)
+node_modules/
+
+# Containers
+*.log

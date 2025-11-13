@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic Control Console Demo</title>
+  <style>
+    :root {
+      --bg: #f7f7f9;
+      --panel: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --brand: #5b3df5;
+      --brand-dark: #4a2ee6;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --pill: #e5f4ff;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    header { position: sticky; top: 0; z-index: 50; display: flex; gap: 12px; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+    .brand { display:flex; gap:10px; align-items:center; }
+    .logo { width: 10px; height: 24px; background: linear-gradient(180deg, var(--brand), #8b5cf6); border-radius: 2px; }
+    .env { display: flex; gap: 6px; align-items: center; }
+    .env .chip { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fafafa; cursor: pointer; font-size: 12px; }
+    .env .chip.active { background: var(--brand); border-color: var(--brand); color: white; }
+
+    #nav { display: flex; gap: 8px; }
+    #nav button { border: 1px solid var(--border); padding: 8px 12px; cursor: pointer; background: #fff; border-radius: 8px; font-weight: 600; color: #374151; }
+    #nav button.active { background: var(--brand); color: white; border-color: var(--brand); }
+
+    main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .grid { display: grid; gap: 16px; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+    .card h3, .card h4 { margin: 0 0 8px 0; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; background: #eef2ff; color: #3730a3; border: 1px solid #e0e7ff; }
+    .pill.ok { background: #ecfdf5; color: #065f46; border-color: #d1fae5; }
+    .pill.warn { background: #fffbeb; color: #854d0e; border-color: #fde68a; }
+    .pill.err { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+
+    .btn { border: 1px solid var(--border); background: #fff; color: #111827; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: white; }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    textarea, select, input[type="text"] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-family: inherit; resize: vertical; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .tab { padding: 8px 12px; border: 1px solid var(--border); background: #fff; border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; color: #374151; }
+    .tab.active { background: var(--brand); color: white; border-color: var(--brand); }
+    .tabpanes > .tabpane { display: none; }
+    .tabpanes > .tabpane.active { display: block; }
+
+    /* Modal */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .modal { width: min(680px, 94vw); background: white; border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .modal header { position: relative; border-bottom: 1px solid var(--border); margin: -16px -16px 12px; padding: 12px 16px; }
+    .modal footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 16px; right: 16px; background: #111827; color: white; padding: 10px 12px; border-radius: 8px; display: none; z-index: 200; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+
+    /* Footer actions */
+    .footer-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 10px; background: linear-gradient(180deg, rgba(247,247,249,0), rgba(247,247,249,1)); border-top: 1px solid var(--border); margin-top: 8px; }
+
+    @media (max-width: 900px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo"></div>
+      <div><strong>Agentic Control Console</strong></div>
+    </div>
+    <div id="nav">
+      <button class="btn" data-view="fleet">Fleet</button>
+      <button class="btn" data-view="escalations">Escalations</button>
+      <button class="btn" data-view="agent">Agent Detail</button>
+      <button class="btn" data-view="studio">Prompt Studio</button>
+      <button class="btn" data-view="eval">Eval & Rollout</button>
+    </div>
+    <div class="env">
+      <span style="color:var(--muted); font-weight:600;">Env</span>
+      <div class="chip active" data-env="Prod">Prod</div>
+      <div class="chip" data-env="UAT">UAT</div>
+      <div class="chip" data-env="Sandbox">Sandbox</div>
+      <div style="width:28px; height:28px; background:#ddd; border-radius:999px; margin-left:8px;"></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Screen 1: Fleet Dashboard -->
+    <section id="fleet" class="view active">
+      <div class="row" style="justify-content: space-between;">
+        <h2 style="margin:8px 0;">Fleet Dashboard</h2>
+        <div class="row">
+          <button class="btn" onclick="goToView('escalations')">View Escalations</button>
+          <button class="btn" onclick="goToView('studio')">Open Prompt Studio</button>
+          <button class="btn" onclick="showToast('Opening Health & Telemetry…')">Health & Telemetry</button>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="card"><div style="color:var(--muted); font-weight:600;">Active Agents</div><div style="font-size:28px; font-weight:800;">74</div></div>
+        <div class="card"><div style="color:var(--muted); font-weight:600;">Tasks In Flight</div><div style="font-size:28px; font-weight:800;">312</div></div>
+        <div class="card"><div style="color:var(--muted); font-weight:600;">Escalations (Last Hour)</div><div style="font-size:28px; font-weight:800;">9</div></div>
+        <div class="card"><div style="color:var(--muted); font-weight:600;">Error Rate</div><div style="font-size:28px; font-weight:800;">0.8%</div></div>
+      </div>
+
+      <div class="row" style="margin-bottom:8px;">
+        <div class="pill">Billing</div>
+        <div class="pill">Field Ops</div>
+        <div class="pill">ERP</div>
+        <div class="pill">Claims</div>
+      </div>
+
+      <div class="card">
+        <h3>Billing Agents</h3>
+        <table>
+          <thead>
+            <tr><th>Agent</th><th>Status</th><th>Autonomy</th><th>Current Tasks</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Balance Transfer Agent</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td>2</td>
+              <td>38</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToAgent('Balance Transfer Agent')">View</button>
+                <button class="btn" onclick="executeAgent('Balance Transfer Agent')">Run</button>
+                <button class="btn" onclick="window.open(agentExecUrl('Balance Transfer Agent'),'_blank')">Open Link</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Ownership Trigger Agent</td>
+              <td><span class="pill warn">Degraded</span></td>
+              <td>1</td>
+              <td>22</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToAgent('Ownership Trigger Agent')">View</button>
+                <button class="btn" onclick="executeAgent('Ownership Trigger Agent')">Run</button>
+                <button class="btn" onclick="window.open(agentExecUrl('Ownership Trigger Agent'),'_blank')">Open Link</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Special Read Scheduler Agent</td>
+              <td><span class="pill">Paused</span></td>
+              <td>0</td>
+              <td>0</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToAgent('Special Read Scheduler Agent')">View</button>
+                <button class="btn" onclick="executeAgent('Special Read Scheduler Agent')">Run</button>
+                <button class="btn" onclick="window.open(agentExecUrl('Special Read Scheduler Agent'),'_blank')">Open Link</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Health Agents</h3>
+        <table>
+          <thead>
+            <tr><th>Agent</th><th>Status</th><th>Autonomy</th><th>Current Tasks</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Patient Discharge Trigger</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td>2</td>
+              <td>12</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToAgent('Patient Discharge Trigger')">View</button>
+                <button class="btn" onclick="executeAgent('Patient Discharge Trigger')">Run</button>
+                <button class="btn" onclick="window.open(agentExecUrl('Patient Discharge Trigger'),'_blank')">Open Link</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Referral Agent</td>
+              <td><span class="pill warn">Degraded</span></td>
+              <td>1</td>
+              <td>7</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToAgent('Referral Agent')">View</button>
+                <button class="btn" onclick="executeAgent('Referral Agent')">Run</button>
+                <button class="btn" onclick="window.open(agentExecUrl('Referral Agent'),'_blank')">Open Link</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Screen 2: Escalations Inbox -->
+    <section id="escalations" class="view">
+      <div class="row" style="justify-content: space-between;">
+        <h2 style="margin:8px 0;">Escalations</h2>
+        <div class="row">
+          <select id="filterSeverity">
+            <option>Severity: All</option>
+            <option>Severity: High</option>
+            <option>Severity: Medium</option>
+            <option>Severity: Low</option>
+          </select>
+          <select id="filterProcess">
+            <option>Process: All</option>
+            <option>Process: CoO</option>
+            <option>Process: Meter Read</option>
+          </select>
+          <select id="filterAgent">
+            <option>Agent: All</option>
+            <option>Balance Transfer Agent</option>
+            <option>Ownership Trigger Agent</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="row" style="justify-content: space-between;">
+            <div><strong>High • Change of Ownership • Balance Transfer Agent</strong></div>
+            <div style="color: var(--muted);">2 mins ago</div>
+          </div>
+          <p>Agent recommends disconnecting service for account #134593 – low confidence.</p>
+          <div class="row" style="justify-content: space-between;">
+            <div style="color: var(--muted);">Confidence: 54%</div>
+            <div class="row">
+              <button class="btn primary" onclick="openReview()">Review</button>
+              <button class="btn" disabled>Auto-approve Next Time</button>
+              <button class="btn" onclick="goToAgentWithCase()">Teach Agent</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content: space-between;">
+            <div><strong>Medium • Meter Read • Ownership Trigger Agent</strong></div>
+            <div style="color: var(--muted);">8 mins ago</div>
+          </div>
+          <p>Clarification requested on estimated read variance for NMI 70011233.</p>
+          <div class="row" style="justify-content: space-between;">
+            <div style="color: var(--muted);">Confidence: 68%</div>
+            <div class="row">
+              <button class="btn" onclick="openReview('Clarification requested…')">Review</button>
+              <button class="btn" disabled>Auto-approve Next Time</button>
+              <button class="btn" onclick="goToAgent('Ownership Trigger Agent')">Teach Agent</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 3: Agent Detail (Behaviour / Prompts default) -->
+    <section id="agent" class="view">
+      <div class="row" style="justify-content: space-between;">
+        <div>
+          <h2 style="margin: 0 0 4px;" id="agentTitle">Balance Transfer Agent</h2>
+          <div style="color: var(--muted);">Billing Domain • Change of Ownership</div>
+        </div>
+        <div class="row">
+          <span class="pill ok">Healthy</span>
+          <div class="row" style="gap:4px;">
+            <span style="color:var(--muted);">Autonomy</span>
+            <input id="autonomy" type="range" min="0" max="3" value="2" />
+            <span id="autonomyVal" style="font-weight:700;">2</span>
+          </div>
+          <button class="btn" onclick="showToast('Agent paused')">Pause</button>
+        </div>
+      </div>
+
+      <div class="tabs" data-tabs="agent-tabs">
+        <div class="tab">Overview</div>
+        <div class="tab">Activity</div>
+        <div class="tab active">Behaviour (Prompts)</div>
+        <div class="tab">Evals</div>
+      </div>
+
+      <div class="tabpanes" data-tabpanes="agent-tabs">
+        <div class="tabpane">Overview content (placeholder for demo)</div>
+        <div class="tabpane">Recent activity (placeholder for demo)</div>
+        <div class="tabpane active">
+          <div class="split">
+            <div>
+              <div class="card">
+                <h3>Prompt Layers</h3>
+                <div style="display:grid; gap:12px;">
+                  <div>
+                    <label>System Prompt (read-only)</label>
+                    <textarea readonly style="background:#f9fafb; color:#6b7280; height:100px;">You are a reliable agent for SA Water billing operations. Follow policies and ensure customer protections.</textarea>
+                  </div>
+                  <div>
+                    <label>Domain Prompt (Billing)</label>
+                    <textarea id="domainPrompt" style="height:120px;">Billing domain norms: apply hardship and vulnerable-customer protections prioritising continuity of service.</textarea>
+                    <div class="row" style="justify-content:flex-end; margin-top:6px;">
+                      <button class="btn" onclick="openEdit('Domain Prompt (Billing)', 'domainPrompt')">Edit</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label>Process Prompt (Change of Ownership)</label>
+                    <textarea id="processPrompt" style="height:120px;">When handling Change of Ownership, ensure balances are transferred fairly, avoiding wrongful disconnections where payment plans exist.</textarea>
+                    <div class="row" style="justify-content:flex-end; margin-top:6px;">
+                      <button class="btn" onclick="openEdit('Process Prompt (Change of Ownership)', 'processPrompt')">Edit</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label>Environment Overrides (<span id="envLabel">Prod</span>)</label>
+                    <textarea id="envOverrides" style="height:100px;">Prod-only guardrails enabled. Log all disconnection intents for manual review.</textarea>
+                    <div class="row" style="justify-content:flex-end; margin-top:6px;">
+                      <button class="btn" onclick="openEdit('Environment Overrides', 'envOverrides')">Edit</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card">
+                <h3>Examples & Corrections</h3>
+                <div style="margin-bottom:8px;">
+                  <label>Scenario</label>
+                  <select id="scenarioSelect">
+                    <option>Disconnection with Active Payment Plan</option>
+                    <option>Final Bill with Credit Balance</option>
+                    <option>Move-In with Pending Special Read</option>
+                  </select>
+                </div>
+                <div class="grid">
+                  <div>
+                    <label>Agent’s Previous Behaviour</label>
+                    <textarea readonly style="height:80px; background:#f9fafb; color:#6b7280;">Recommended disconnection despite active payment plan (low confidence).</textarea>
+                  </div>
+                  <div>
+                    <label>Desired Behaviour</label>
+                    <textarea id="desiredBehaviour" style="height:100px;">Keep service connected, notify customer, and schedule follow-up; never disconnect vulnerable customers.</textarea>
+                  </div>
+                </div>
+                <div class="row" style="justify-content:flex-end; margin-top:8px;">
+                  <button class="btn" onclick="showToast('Example added to training set')">Add as Training Example</button>
+                </div>
+              </div>
+              <div class="card">
+                <h3>Actions</h3>
+                <div class="row">
+                  <button class="btn" onclick="executeCurrentAgent()">Run Agent</button>
+                  <button class="btn" onclick="openCurrentAgentLink()">Open Link</button>
+                  <button class="btn" onclick="goToView('eval'); seedEval('agent')">Run Eval Suite</button>
+                  <button class="btn" onclick="goToView('eval'); seedEval('propose')">Propose New Version</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tabpane">Evals (placeholder for demo)</div>
+      </div>
+    </section>
+
+    <!-- Screen 4: Prompt Studio -->
+    <section id="studio" class="view">
+      <h2 style="margin:8px 0;">Prompt Studio</h2>
+      <div class="split">
+        <aside>
+          <div class="card">
+            <h4>Prompt Packs</h4>
+            <ul id="packList" style="list-style:none; padding:0; margin:0; display:grid; gap:6px;">
+              <li><button class="btn" data-pack="SA Water – CoO Core v1.3">SA Water – CoO Core v1.3</button></li>
+              <li><button class="btn" data-pack="SA Water – Vulnerable Customer Handling v1.1">SA Water – Vulnerable Customer Handling v1.1</button></li>
+              <li><button class="btn" data-pack="GWW – Grange Billing Twin v0.9">GWW – Grange Billing Twin v0.9</button></li>
+            </ul>
+          </div>
+        </aside>
+        <section>
+          <div class="card">
+            <h3 id="packTitle">SA Water – Vulnerable Customer Handling v1.1</h3>
+            <p id="packDesc" style="color:var(--muted);">Guidance to protect vulnerable customers during billing and change-of-ownership flows.</p>
+            <p style="margin-top:-6px;"><strong>Affects:</strong> Balance Transfer Agent • Ownership Trigger Agent • Special Read Scheduler Agent</p>
+
+            <div class="tabs" data-tabs="studio-tabs">
+              <div class="tab active">Instructions</div>
+              <div class="tab">Examples</div>
+              <div class="tab">Policies</div>
+            </div>
+            <div class="tabpanes" data-tabpanes="studio-tabs">
+              <div class="tabpane active">
+                <label>Consolidated Instructions</label>
+                <textarea id="packInstructions" style="height:160px;">Core behaviour for handling vulnerable customers. Always prefer continuity of service, apply hardship policies, and escalate human review for any disconnection intent.</textarea>
+                <div class="footer-actions">
+                  <button class="btn" onclick="openEdit('Edit Instructions', 'packInstructions')">Edit</button>
+                  <button class="btn" onclick="showToast('Prompt pack draft saved')">Save Draft</button>
+                  <button class="btn" onclick="goToView('eval'); seedEval('pack')">Run Regression Tests</button>
+                  <button class="btn primary" onclick="goToView('eval'); seedEval('propose-pack')">Propose for Deployment</button>
+                </div>
+              </div>
+              <div class="tabpane">
+                <div class="row" style="justify-content: space-between;">
+                  <h4 style="margin:8px 0;">Examples</h4>
+                  <button class="btn" onclick="openAddExample()">Add Example from Escalation</button>
+                </div>
+                <table>
+                  <thead>
+                    <tr><th>Scenario</th><th>Status</th><th>Last Run</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Disconnection with Active Payment Plan</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
+                    <tr><td>Final Bill with Credit Balance</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
+                    <tr><td>Move-In with Pending Special Read</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="tabpane">
+                <h4>Policies</h4>
+                <ul>
+                  <li>Never disconnect vulnerable customers without human approval.</li>
+                  <li>Always respect active payment plans.</li>
+                  <li>Log and justify any service interruption intent.</li>
+                </ul>
+                <div class="footer-actions">
+                  <button class="btn" onclick="showToast('Policies edited (mock)')">Edit</button>
+                  <button class="btn primary" onclick="showToast('Policy changes saved (mock)')">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Screen 5: Eval & Rollout -->
+    <section id="eval" class="view">
+      <h2 style="margin:8px 0;">Evaluation & Rollout</h2>
+      <p id="evalSubtext" style="color:var(--muted);">Balance Transfer Agent • New Prompt Version v1.8.0</p>
+
+      <div class="metrics">
+        <div class="card">
+          <strong>Before (v1.7.3)</strong><br />
+          Disconnection false positives: 12.4%<br />
+          Escalation rate: 7%<br />
+          SLA breaches: 5
+        </div>
+        <div class="card">
+          <strong>After (v1.8.0 – Test Run)</strong><br />
+          Disconnection false positives: 8.1%<br />
+          Escalation rate: 8%<br />
+          SLA breaches: 5
+        </div>
+        <div class="card">
+          <strong>Confidence</strong><br />
+          Eval coverage: 95%<br />
+          Critical regressions: 0<br />
+          Policy breaches: 0
+        </div>
+        <div class="card">
+          <strong>Notes</strong><br />
+          Improved on 7 edge cases<br />
+          No general billing regressions
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Test Suites</h3>
+        <table>
+          <thead>
+            <tr><th>Suite</th><th>Status</th><th>Passed / Total</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>CoO Disconnection Scenarios</td><td>✅</td><td>45 / 45</td><td>Improved on 7 edge cases</td></tr>
+            <tr><td>General Billing Scenarios</td><td>✅</td><td>120 / 120</td><td>No regressions</td></tr>
+            <tr><td>Vulnerable Customer Scenarios</td><td>✅</td><td>30 / 30</td><td>Coverage increased</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Rollout</h3>
+        <div class="row">
+          <label style="min-width:140px;">Strategy</label>
+          <select id="rolloutStrategy" style="max-width: 260px;">
+            <option>Canary (5%)</option>
+            <option>Gradual (5% → 25% → 100%)</option>
+            <option>Full prod</option>
+          </select>
+          <label style="min-width:140px;">Region/Tenant</label>
+          <select id="rolloutRegion" style="max-width: 260px;">
+            <option>All</option>
+            <option>SA Water</option>
+            <option>GWW</option>
+          </select>
+        </div>
+        <div class="row" style="justify-content:flex-end; margin-top:10px;">
+          <button class="btn" onclick="goToView('agent')">Back to Agent</button>
+          <button class="btn" onclick="goToView('studio')">Back to Prompt Studio</button>
+          <button class="btn primary" onclick="deploy()">Deploy</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Review Modal -->
+  <div id="reviewModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header class="row" style="justify-content: space-between;">
+        <strong>Escalation Review</strong>
+        <button class="btn" onclick="closeModal('reviewModal')">Close</button>
+      </header>
+      <div class="grid">
+        <div class="card">
+          <h4>Context Summary</h4>
+          <p id="reviewContext">Change of Ownership request for account #134593. Payment plan active; customer marked as vulnerable.</p>
+        </div>
+        <div class="card">
+          <h4>Agent’s Proposed Action</h4>
+          <p>Disconnect service due to overdue balance.</p>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" onclick="showToast('Edited (mock)')">Edit</button>
+        <button class="btn" onclick="showToast('Rejected (mock)')">Reject</button>
+        <button class="btn primary" onclick="showToast('Approved (mock)')">Approve</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Generic Edit Modal -->
+  <div id="editModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header class="row" style="justify-content: space-between;">
+        <strong id="editTitle">Edit</strong>
+        <button class="btn" onclick="closeModal('editModal')">Close</button>
+      </header>
+      <label id="editLabel">Edit Text</label>
+      <textarea id="editTextarea" style="height:220px;"></textarea>
+      <footer>
+        <button class="btn" onclick="discardEdit()">Discard</button>
+        <button class="btn" onclick="saveDraft()">Save Draft</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Add Example Modal -->
+  <div id="addExampleModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header class="row" style="justify-content: space-between;">
+        <strong>Add Example from Escalation</strong>
+        <button class="btn" onclick="closeModal('addExampleModal')">Close</button>
+      </header>
+      <div class="grid">
+        <div>
+          <label>Scenario Name</label>
+          <input type="text" id="exName" placeholder="e.g., Payment plan active – do not disconnect" />
+        </div>
+        <div>
+          <label>Expected Behaviour</label>
+          <textarea id="exExpected" style="height:120px;">Keep connected; notify customer; schedule follow-up.</textarea>
+        </div>
+      </div>
+      <footer>
+        <button class="btn" onclick="showToast('Cancelled')">Cancel</button>
+        <button class="btn primary" onclick="showToast('Example added (mock)'); closeModal('addExampleModal')">Add Example</button>
+      </footer>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // Agent execution config (update baseUrl/path to match your Health services)
+    const AGENTS_EXEC = {
+      baseUrl: 'http://localhost:8000',
+      path: '/agents/run',
+      perAgent: {
+        'Balance Transfer Agent': '/agents/balance-transfer/run',
+        'Ownership Trigger Agent': '/agents/ownership-trigger/run',
+        'Special Read Scheduler Agent': '/agents/special-read-scheduler/run',
+        'Patient Discharge Trigger': '/agents/patient-discharge-trigger/run',
+        'Referral Agent': '/agents/referral/run'
+      }
+    };
+
+    // Navigation
+    const buttons = document.querySelectorAll('#nav button');
+    const views = document.querySelectorAll('.view');
+    function goToView(id) {
+      views.forEach(v => v.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      buttons.forEach(b => b.classList.toggle('active', b.dataset.view === id));
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    buttons.forEach(b => b.addEventListener('click', () => goToView(b.dataset.view)));
+
+    // Agent execution helpers
+    function agentExecUrl(name) {
+      const cfg = AGENTS_EXEC || {};
+      if (!cfg.baseUrl) return '#';
+      if (cfg.perAgent && cfg.perAgent[name]) return cfg.baseUrl + cfg.perAgent[name];
+      const q = encodeURIComponent(name);
+      const path = cfg.path || '/agents/run';
+      return cfg.baseUrl + path + '?name=' + q;
+    }
+    async function executeAgent(name) {
+      const url = agentExecUrl(name);
+      showToast('Executing ' + name + '…');
+      try {
+        const res = await fetch(url, { method: 'POST' });
+        if (res.ok) {
+          showToast('Started: ' + name);
+        } else {
+          showToast('Failed to start ' + name + ' (HTTP ' + res.status + ')');
+        }
+      } catch (e) {
+        // Fallback: open the execution URL
+        window.open(url, '_blank');
+        showToast('Could not reach service; opened link.');
+      }
+    }
+
+    function goToAgent(name) {
+      document.getElementById('agentTitle').textContent = name || 'Balance Transfer Agent';
+      goToView('agent');
+    }
+    function goToAgentWithCase() {
+      goToAgent('Balance Transfer Agent');
+      showToast('Loaded case context into Behaviour tab');
+    }
+
+    // Env selector
+    const envChips = document.querySelectorAll('.env .chip');
+    const envLabel = document.getElementById('envLabel');
+    envChips.forEach(ch => ch.addEventListener('click', () => {
+      envChips.forEach(x => x.classList.remove('active'));
+      ch.classList.add('active');
+      const env = ch.dataset.env;
+      if (envLabel) envLabel.textContent = env;
+      // Swap base URL per environment (customise as needed)
+      if (env === 'Prod') AGENTS_EXEC.baseUrl = 'http://localhost:8000';
+      else if (env === 'UAT') AGENTS_EXEC.baseUrl = 'http://localhost:8001';
+      else AGENTS_EXEC.baseUrl = 'http://localhost:8002';
+      showToast('Environment set to ' + env + ' • Exec base ' + AGENTS_EXEC.baseUrl);
+    }));
+
+    // Autonomy slider display
+    const autonomy = document.getElementById('autonomy');
+    const autonomyVal = document.getElementById('autonomyVal');
+    if (autonomy) autonomy.addEventListener('input', () => autonomyVal.textContent = autonomy.value);
+
+    // Tabs logic
+    function initTabs(group) {
+      const tabs = document.querySelectorAll('.tabs[data-tabs="' + group + '"] .tab');
+      const panes = document.querySelectorAll('.tabpanes[data-tabpanes="' + group + '"] .tabpane');
+      tabs.forEach((tab, idx) => tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        panes.forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        panes[idx].classList.add('active');
+      }));
+    }
+    initTabs('agent-tabs');
+    initTabs('studio-tabs');
+
+    // Toast helper
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2200);
+    }
+
+    // Review modal
+    function openReview(ctx) {
+      if (ctx) document.getElementById('reviewContext').textContent = ctx;
+      openModal('reviewModal');
+    }
+
+    // Generic modal helpers
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // Edit modal wiring
+    let __editTarget = null;
+    function openEdit(title, targetId) {
+      __editTarget = document.getElementById(targetId);
+      document.getElementById('editTitle').textContent = title;
+      document.getElementById('editTextarea').value = __editTarget ? __editTarget.value : '';
+      document.getElementById('editLabel').textContent = title;
+      openModal('editModal');
+    }
+    function saveDraft() {
+      if (__editTarget) {
+        __editTarget.value = document.getElementById('editTextarea').value;
+      }
+      closeModal('editModal');
+      showToast('Draft prompt saved to Agent Definition v1.7.3 (not deployed).');
+    }
+    function discardEdit() {
+      closeModal('editModal');
+      showToast('Discarded changes');
+    }
+
+    // Prompt Studio pack switching (mock)
+    const packList = document.getElementById('packList');
+    const packTitle = document.getElementById('packTitle');
+    const packDesc = document.getElementById('packDesc');
+    if (packList) {
+      packList.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-pack]');
+        if (!btn) return;
+        const name = btn.getAttribute('data-pack');
+        packTitle.textContent = name;
+        packDesc.textContent = name.includes('Vulnerable')
+          ? 'Guidance to protect vulnerable customers during billing and change-of-ownership flows.'
+          : name.includes('CoO Core')
+            ? 'Core prompts for Change of Ownership across SA Water.'
+            : 'Twin prompts for Grange Billing test environment.';
+        showToast('Selected: ' + name);
+      });
+    }
+
+    // Add Example modal
+    function openAddExample() { openModal('addExampleModal'); }
+
+    // Eval seeding based on source navigation
+    function seedEval(source) {
+      const sub = document.getElementById('evalSubtext');
+      if (!sub) return;
+      if (source === 'pack') {
+        sub.textContent = 'Prompt Pack: SA Water – Vulnerable Customer Handling v1.1 • Proposed v1.8.0';
+      } else if (source === 'propose-pack') {
+        sub.textContent = 'Proposed Deployment • SA Water – Vulnerable Customer Handling v1.1';
+      } else if (source === 'propose') {
+        sub.textContent = 'Balance Transfer Agent • Proposed Prompt Version v1.8.0';
+      } else {
+        sub.textContent = 'Balance Transfer Agent • New Prompt Version v1.8.0';
+      }
+    }
+
+    // Deploy action
+    function deploy() {
+      const strat = document.getElementById('rolloutStrategy').value;
+      const region = document.getElementById('rolloutRegion').value;
+      showToast('Deployment scheduled: Version v1.8.0 → Prod (' + strat + ') for ' + region + '.');
+    }
+  </script>
+</body>
+</html>

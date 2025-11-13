@@ -1,0 +1,58 @@
+{
+  "scenarios": [
+    {
+      "id": "base_allow_gp_cmht_deny_social",
+      "patient_ref": "Patient/123",
+      "summary": "Allow GP and CMHT; deny social services",
+      "allow": [
+        {"recipient": "Practitioner/123", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["treatment", "care-coordination"]},
+        {"recipient": "Organization/77", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["care-coordination"]}
+      ],
+      "deny": [
+        {"recipient": "Organization/999", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["social-services"]}
+      ]
+    },
+    {
+      "id": "minor_guardian_required",
+      "patient_ref": "Patient/200",
+      "summary": "Minor; guardian consent required for any share",
+      "allow": [
+        {"recipient": "RelatedPerson/300", "actions": ["consent_grant"], "purpose_of_use": ["treatment"]}
+      ],
+      "deny": [
+        {"recipient": "*", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["*"]}
+      ]
+    },
+    {
+      "id": "research_prohibited",
+      "patient_ref": "Patient/500",
+      "summary": "Explicit refusal for research/analytics",
+      "allow": [
+        {"recipient": "Practitioner/321", "actions": ["share_summary"], "purpose_of_use": ["treatment"]}
+      ],
+      "deny": [
+        {"recipient": "*", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["analytics", "research"]}
+      ]
+    },
+    {
+      "id": "emergency_override",
+      "patient_ref": "Patient/700",
+      "summary": "Emergency treatment permitted for 24h override",
+      "allow": [
+        {"recipient": "*", "actions": ["share_summary"], "purpose_of_use": ["emergency-treatment"], "constraints": {"ttl_hours": 24}}
+      ],
+      "deny": []
+    },
+    {
+      "id": "cross_border_denied",
+      "patient_ref": "Patient/800",
+      "summary": "Telehealth to non-AU providers denied",
+      "allow": [
+        {"recipient": "Practitioner/au-111", "actions": ["share_summary"], "purpose_of_use": ["treatment"]}
+      ],
+      "deny": [
+        {"recipient": "Practitioner/nonau-*", "actions": ["share_summary"], "purpose_of_use": ["treatment"]}
+      ]
+    }
+  ]
+}

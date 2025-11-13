@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "id": "ds1",
+      "text": "Discharge Summary:\nPatient admitted for major depressive disorder exacerbation. Reports intermittent passive suicidal ideation without plan or intent. Safety plan completed; close monitoring recommended.\nHandover facts: suicide_risk=true; ideation=passive; plan=none; safety_plan=completed.\nRecommendations: GP within 7 days; Psychiatry review in 14 days; PHQ-9 weekly x4. Social: lives alone; supports limited; housing stable."
+    },
+    {
+      "id": "ds2",
+      "text": "Discharge Summary:\nBipolar II disorder; quetiapine unchanged. Reports housing instability and missed doses last week. No active suicidal ideation.\nHandover facts: housing_risk=true; missed_medication=true; supports=limited; follow_up_needed=community_mh.\nRecommendations: GP within 7 days; Community MH nurse check-in at 72h; GAD-7 weekly x4."
+    },
+    {
+      "id": "ds3",
+      "text": "Discharge Summary:\nPostpartum depression; sertraline initiated 25mg yesterday; monitor for side effects and adherence. PHQ-9=19 on discharge.\nHandover facts: medication_change=true; sertraline_started=true; adherence_monitor=true; risk=moderate.\nRecommendations: GP within 7 days; Perinatal psych review in 7 days; PHQ-9 weekly x6."
+    }
+  ]
+}

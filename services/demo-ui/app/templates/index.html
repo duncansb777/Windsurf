@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Health Agentic Demo</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Health Agentic Demo</h1>
+    <p>Execute flows and observe outputs and message trace across agents.</p>
+  </header>
+
+  <main class="grid">
+    <section class="panel">
+      <h2>Actions</h2>
+      <div class="actions">
+        <label for="patient-select">Patient:</label>
+        <select id="patient-select"></select>
+        <button id="btn-discharge">Run Discharge Flow</button>
+        <button id="btn-agentis">Run Compliance Policy Agentic LLM Demo</button>
+        <button id="btn-consent">Check Consent (to GP for treatment)</button>
+        <button id="btn-agentis-referral">Execute Agent Referral (LLM + Consent)</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section id="pane-agentis-referral" class="panel hidden">
+      <h2>Agent Referral (LLM plan + execution)</h2>
+      <div class="cols">
+        <div>
+          <h3>LLM Input (System)</h3>
+          <pre id="referral-llm-system" class="code"></pre>
+          <h3>LLM Input (User)</h3>
+          <pre id="referral-llm-user" class="code"></pre>
+        </div>
+        <div>
+          <h3>LLM Output</h3>
+          <pre id="referral-llm-output" class="code"></pre>
+        </div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Handover Facts</h3>
+          <strong>Note</strong>
+          <pre id="referral-handover-note" class="code"></pre>
+          <strong>Risk Summary</strong>
+          <pre id="referral-handover-risk" class="code"></pre>
+        </div>
+        <div>
+          <h3>GP Message (Interpreted)</h3>
+          <pre id="referral-gp-message" class="code"></pre>
+        </div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Executed Tasks</h3>
+          <pre id="referral-exec-tasks" class="code"></pre>
+        </div>
+        <div>
+          <h3>Executed Messages</h3>
+          <pre id="referral-exec-messages" class="code"></pre>
+        </div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Share Result — Allowed</h3>
+          <pre id="referral-share-allowed" class="code"></pre>
+        </div>
+        <div>
+          <h3>Share Result — Denied</h3>
+          <pre id="referral-share-denied" class="code"></pre>
+        </div>
+      </div>
+      <div style="margin-top: 10px; display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        <div>
+          <h3>Transport Booking</h3>
+          <div id="uber-prompt" style="display:none; gap:8px; align-items:center;">
+            <span>Would the patient like an Uber for transport?</span>
+            <button id="btn-uber-yes">Yes</button>
+            <button id="btn-uber-no">No</button>
+          </div>
+          <pre id="uber-result" style="display:none;"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="pane-consent" class="panel hidden">
+      <h2>Consent Decision</h2>
+      <div class="cols">
+        <div>
+          <h3>Request</h3>
+          <pre id="consent-request" class="code"></pre>
+        </div>
+        <div>
+          <h3>Decision</h3>
+          <pre id="consent-decision" class="code"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="pane-agentis" class="panel hidden">
+      <h2>Agentis LLM Prompt and Output</h2>
+      <div class="cols">
+        <div>
+          <h3>Prompt (System)</h3>
+          <pre id="result-llm-system" class="code"></pre>
+          <h3>Prompt (User)</h3>
+          <pre id="result-llm-user" class="code"></pre>
+        </div>
+        <div>
+          <h3>LLM Output</h3>
+          <pre id="result-llm-output" class="code"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Message Trace</h2>
+      <ol id="trace"></ol>
+    </section>
+
+    <section class="panel">
+      <h2>Agent Flow Map</h2>
+      <div id="flowmap"></div>
+    </section>
+
+    <section id="pane-discharge" class="panel hidden">
+      <h2>Discharge Flow Results</h2>
+      <div id="bundle-denied" class="banner error hidden">Patient bundle access denied.</div>
+      <div class="cols">
+        <div>
+          <h3>Discharge Event</h3>
+          <pre id="result-discharge-event" class="code"></pre>
+        </div>
+        <div>
+          <h3>Patient Bundle</h3>
+          <pre id="result-patient-bundle" class="code"></pre>
+        </div>
+        <div>
+          <h3>Providers (HCA)</h3>
+          <pre id="result-providers" class="code"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="pane-audit" class="panel hidden">
+      <h2>Audit Check Results</h2>
+      <div class="cols">
+        <div>
+          <h3>Write-back ID</h3>
+          <pre id="result-writeback" class="code"></pre>
+        </div>
+        <div>
+          <h3>Alert ID</h3>
+          <pre id="result-alert" class="code"></pre>
+        </div>
+        <div>
+          <h3>Audit Entries</h3>
+          <pre id="result-audit" class="code"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="pane-referral" class="panel hidden">
+      <h2>Referral → Task Results</h2>
+      <div class="cols">
+        <div>
+          <h3>Referrals</h3>
+          <pre id="result-referrals" class="code"></pre>
+        </div>
+        <div>
+          <h3>Created Task</h3>
+          <pre id="result-created-task" class="code"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>StdIO MCP mocks: Epic + HCA. Ownership Trigger at :8001.</small>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+name: Build Desktop App
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'desktop-console/**'
+      - 'agentic-control-demo.html'
+
+jobs:
+  build-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        working-directory: desktop-console
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build installer
+        run: npm run dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: desktop-console/dist/**

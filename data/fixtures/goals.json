@@ -1,0 +1,19 @@
+{
+  "sets": [
+    [
+      "GP follow-up within 7 days",
+      "Psychiatry review within 14 days",
+      "Weekly PHQ-9 for 4 weeks"
+    ],
+    [
+      "Community MH nurse call within 72 hours",
+      "Sleep hygiene education",
+      "Weekly GAD-7 for 4 weeks"
+    ],
+    [
+      "Perinatal psychiatry review in 7 days",
+      "Lactation consultant appointment in 3 days",
+      "Weekly PHQ-9 for 6 weeks"
+    ]
+  ]
+}

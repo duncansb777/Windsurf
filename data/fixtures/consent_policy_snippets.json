@@ -1,0 +1,36 @@
+{
+  "consents": [
+    {
+      "patient_ref": "Patient/123",
+      "allow": [
+        {"recipient": "Practitioner/123", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["treatment", "care-coordination"]},
+        {"recipient": "Organization/77", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["care-coordination"]}
+      ],
+      "deny": [
+        {"recipient": "Organization/999", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["social-services"]}
+      ]
+    },
+    {
+      "patient_ref": "Patient/2",
+      "allow": [
+        {"recipient": "Practitioner/*", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["treatment", "care-coordination", "education"]},
+        {"recipient": "Organization/*", "actions": ["share_summary", "task_assignment"], "purpose_of_use": ["treatment", "care-coordination", "education"]}
+      ],
+      "deny": []
+    }
+  ],
+  "policies": [
+    {
+      "id": "AU-Consent-001",
+      "text": "Respect Australian consent. If consent denies an action, notify the clinician with the reason."
+    },
+    {
+      "id": "AU-PHI-Redaction-001",
+      "text": "Remove gratuitous identifiers from prompts; keep identifiers only in tool arguments."
+    },
+    {
+      "id": "AU-Purpose-Binding-001",
+      "text": "Every tool call must include purpose_of_use and be evaluated against consent."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "agentic-control-console",
+  "version": "0.1.0",
+  "description": "Desktop wrapper for Agentic Control Console demo",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.4.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.example.agenticcontrolconsole",
+    "productName": "Agentic Control Console",
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraFiles": [
+      {
+        "from": "..",
+        "to": "app",
+        "filter": [
+          "agentic-control-demo.html"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
