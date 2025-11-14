@@ -44,7 +44,7 @@
       "artifactName": "Agentic-Control-Console-${version}-${arch}.${ext}"
     },
     "dmg": {
-      "additionalContents": [
+      "contents": [
         { "path": "build/Unquarantine.command", "x": 120, "y": 360 },
         { "path": "build/README.txt", "x": 120, "y": 470 },
         { "path": "/Applications", "type": "link", "x": 420, "y": 200 }
