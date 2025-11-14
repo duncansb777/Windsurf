@@ -1,0 +1,34 @@
+version: "3.9"
+services:
+  console:
+    build:
+      context: .
+      dockerfile: docker/console/Dockerfile
+    image: agentic-console:demo
+    ports:
+      - "8080:8000"
+    depends_on:
+      - demo-ui
+    restart: unless-stopped
+
+  demo-ui:
+    build:
+      context: .
+      dockerfile: docker/demo-ui/Dockerfile
+    image: health-demo-ui:demo
+    environment:
+      OWNERSHIP_URL: http://ownership-trigger:8001
+    expose:
+      - "8000"
+    depends_on:
+      - ownership-trigger
+    restart: unless-stopped
+
+  ownership-trigger:
+    build:
+      context: .
+      dockerfile: docker/ownership-trigger/Dockerfile
+    image: ownership-trigger:demo
+    ports:
+      - "8001:8001"
+    restart: unless-stopped

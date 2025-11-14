@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import csv
@@ -10,6 +11,13 @@ from libs.agentis.tools.policy import check_consent
 from libs.common.mcp_client import make_epic_client, make_hca_client
 
 app = FastAPI(title="Ownership Trigger Agent")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class DischargeDemoResponse(BaseModel):

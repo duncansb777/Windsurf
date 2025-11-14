@@ -3,8 +3,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import httpx
+import os
 
-OWNERSHIP_URL = "http://127.0.0.1:8001"
+OWNERSHIP_URL = os.environ.get("OWNERSHIP_URL", "http://127.0.0.1:8001")
 
 app = FastAPI(title="Health Agentic Demo UI")
 app.mount("/static", StaticFiles(directory="services/demo-ui/app/static"), name="static")

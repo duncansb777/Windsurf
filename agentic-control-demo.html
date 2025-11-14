@@ -6,17 +6,17 @@
   <title>Agentic Control Console Demo</title>
   <style>
     :root {
-      --bg: #f7f7f9;
+      --bg: #f6f7fb;
       --panel: #ffffff;
-      --border: #e5e7eb;
-      --text: #111827;
-      --muted: #6b7280;
-      --brand: #5b3df5;
-      --brand-dark: #4a2ee6;
+      --border: #e6e8f0;
+      --text: #0b1020;
+      --muted: #6b6f7b;
+      --brand: #5f259f; /* DXC primary */
+      --brand-dark: #4a1e7d;
       --ok: #10b981;
       --warn: #f59e0b;
       --err: #ef4444;
-      --pill: #e5f4ff;
+      --pill: #efe9fa;
     }
     * { box-sizing: border-box; }
     body { font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
@@ -28,12 +28,16 @@
     .env .chip.active { background: var(--brand); border-color: var(--brand); color: white; }
 
     #nav { display: flex; gap: 8px; }
-    #nav button { border: 1px solid var(--border); padding: 8px 12px; cursor: pointer; background: #fff; border-radius: 8px; font-weight: 600; color: #374151; }
-    #nav button.active { background: var(--brand); color: white; border-color: var(--brand); }
+    #nav button { border: 1px solid var(--border); padding: 10px 14px; cursor: pointer; background: #fff; border-radius: 10px; font-weight: 600; color: #1f2937; box-shadow: 0 1px 1px rgba(0,0,0,0.04); }
+    #nav button.active { background: var(--brand); color: white; border-color: var(--brand); box-shadow: 0 6px 14px rgba(95,37,159,0.22); }
 
     main { padding: 16px; max-width: 1200px; margin: 0 auto; }
     .view { display: none; }
     .view.active { display: block; }
+    .card { box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06); border: 1px solid var(--border); border-radius: 12px; }
+    .btn { transition: transform 0.02s ease-in, box-shadow 0.2s ease; }
+    .btn:hover { box-shadow: 0 8px 18px rgba(0,0,0,0.08); }
+    .btn:active { transform: translateY(1px); }
 
     .grid { display: grid; gap: 16px; }
 
@@ -99,6 +103,7 @@
       <button class="btn" data-view="agent">Agent Detail</button>
       <button class="btn" data-view="studio">Prompt Studio</button>
       <button class="btn" data-view="eval">Eval & Rollout</button>
+      <button class="btn" data-view="healthAgents">Health Agents</button>
     </div>
     <div class="env">
       <span style="color:var(--muted); font-weight:600;">Env</span>
@@ -211,7 +216,77 @@
           </tbody>
         </table>
       </div>
+
+      <div class="row" style="margin-top:8px;">
+        <button class="btn" onclick="goToView('healthAgents')">Open Health Agents</button>
+      </div>
     </section>
+
+  <!-- Health Agents (actions) -->
+  <section id="healthAgents" class="view">
+    <h2 style="margin:8px 0;">Health Agents</h2>
+    <p style="color:var(--muted); margin-top:-8px;">Run common Health agent flows. These call the local Ownership Trigger backend directly from the app.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Patient Discharge Trigger</h3>
+        <div class="row" style="gap:8px;">
+          <select id="ha_patient_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+            <option value="">Select patient…</option>
+          </select>
+          <input id="ha_patient" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <button class="btn primary" onclick="runHealthAgent('discharge', { patient_id: val('ha_patient') })">Run Discharge</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Referral Agent</h3>
+        <div class="row" style="gap:8px;">
+          <select id="ha_patient_ref_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+            <option value="">Select patient…</option>
+          </select>
+          <input id="ha_patient_ref" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <button class="btn" onclick="runHealthAgent('referral', { patient_id: val('ha_patient_ref') })">Run Referral</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Agentis Referral (LLM plan)</h3>
+        <div class="row" style="gap:8px;">
+          <select id="ha_patient_agentis_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+            <option value="">Select patient…</option>
+          </select>
+          <input id="ha_patient_agentis" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <button class="btn" onclick="runHealthAgent('agentisReferral', { patient_id: val('ha_patient_agentis'), context: {} })">Run Agentis Referral</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Consent Check</h3>
+        <div class="row" style="gap:8px;">
+          <select id="ha_patient_con_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+            <option value="">Select patient…</option>
+          </select>
+          <input id="ha_patient_con" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <input id="ha_recipient" placeholder="Recipient ref (e.g., Practitioner/prov-002)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <input id="ha_action" placeholder="Action (e.g., disclose)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <input id="ha_pou" placeholder="Purpose (e.g., treatment)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <button class="btn" onclick="runHealthAgent('consent', { patient_id: val('ha_patient_con'), recipient_ref: val('ha_recipient'), action: val('ha_action'), purpose_of_use: val('ha_pou') })">Run Consent Check</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Audit Check</h3>
+        <div class="row" style="gap:8px;">
+          <button class="btn" onclick="runHealthAgent('audit', {})">Run Audit Check</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <h3>Result</h3>
+      <pre id="ha_result" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+    </div>
+  </section>
 
     <!-- Screen 2: Escalations Inbox -->
     <section id="escalations" class="view">
@@ -515,6 +590,8 @@
     </section>
   </main>
 
+  
+
   <!-- Review Modal -->
   <div id="reviewModal" class="modal-backdrop" role="dialog" aria-modal="true">
     <div class="modal">
@@ -608,6 +685,8 @@
     buttons.forEach(b => b.addEventListener('click', () => goToView(b.dataset.view)));
 
     // Agent execution helpers
+    function val(id){ const el=document.getElementById(id); return el? (el.value||'').trim() : ''; }
+    function sel(id){ const el=document.getElementById(id); return el? (el.value||'').trim() : ''; }
     function agentExecUrl(name) {
       const cfg = AGENTS_EXEC || {};
       if (!cfg.baseUrl) return '#';
@@ -633,6 +712,60 @@
       }
     }
 
+    // Health API config (Ownership Trigger backend)
+    const HEALTH_API = {
+      baseUrl: 'http://127.0.0.1:8001',
+      endpoints: {
+        discharge: '/demo/discharge',
+        referral: '/demo/referral',
+        agentisReferral: '/demo/agentis-referral',
+        consent: '/demo/consent-check',
+        audit: '/demo/audit-check'
+      }
+    };
+
+    // Health Agents execution direct to backend
+    async function runHealthAgent(kind, payload) {
+      const ep = (HEALTH_API.endpoints || {})[kind];
+      const url = (HEALTH_API.baseUrl || '') + ep;
+      const label = {
+        discharge: 'Discharge',
+        referral: 'Referral',
+        agentisReferral: 'Agentis Referral',
+        consent: 'Consent Check',
+        audit: 'Audit Check'
+      }[kind] || kind;
+      showToast('Running ' + label + '…');
+      try {
+        // If no typed patient_id, use selected from dropdown where available
+        if (payload && !payload.patient_id) {
+          const map = {
+            discharge: 'ha_patient_sel',
+            referral: 'ha_patient_ref_sel',
+            agentisReferral: 'ha_patient_agentis_sel',
+            consent: 'ha_patient_con_sel'
+          };
+          const sid = map[kind];
+          if (sid) {
+            const selVal = sel(sid);
+            if (selVal) payload.patient_id = selVal;
+          }
+        }
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload||{})
+        });
+        const data = await res.json().catch(() => ({}));
+        document.getElementById('ha_result').textContent = JSON.stringify(data, null, 2);
+        if (!res.ok) showToast(label + ' failed (HTTP ' + res.status + ')');
+        else showToast(label + ' completed');
+      } catch (e) {
+        document.getElementById('ha_result').textContent = String(e);
+        showToast('Request error for ' + label);
+      }
+    }
+
     function goToAgent(name) {
       document.getElementById('agentTitle').textContent = name || 'Balance Transfer Agent';
       goToView('agent');
@@ -651,9 +784,16 @@
       const env = ch.dataset.env;
       if (envLabel) envLabel.textContent = env;
       // Swap base URL per environment (customise as needed)
-      if (env === 'Prod') AGENTS_EXEC.baseUrl = 'http://localhost:8000';
-      else if (env === 'UAT') AGENTS_EXEC.baseUrl = 'http://localhost:8001';
-      else AGENTS_EXEC.baseUrl = 'http://localhost:8002';
+      if (env === 'Prod') {
+        AGENTS_EXEC.baseUrl = 'http://localhost:8000';
+        HEALTH_API.baseUrl = 'http://127.0.0.1:8001';
+      } else if (env === 'UAT') {
+        AGENTS_EXEC.baseUrl = 'http://localhost:8001';
+        HEALTH_API.baseUrl = 'http://127.0.0.1:8001';
+      } else {
+        AGENTS_EXEC.baseUrl = 'http://localhost:8002';
+        HEALTH_API.baseUrl = 'http://127.0.0.1:8001';
+      }
       showToast('Environment set to ' + env + ' • Exec base ' + AGENTS_EXEC.baseUrl);
     }));
 
