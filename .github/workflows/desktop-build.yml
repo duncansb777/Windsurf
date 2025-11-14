@@ -8,11 +8,12 @@ on:
       - 'agentic-control-demo.html'
 
 jobs:
-  build-matrix:
-    runs-on: ${{ matrix.os }}
+  build-macos:
+    runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        os: [macos-latest]
     defaults:
       run:
         working-directory: desktop-console
@@ -30,6 +31,14 @@ jobs:
 
       - name: Build installer
         run: npm run dist
+
+      - name: Add macOS helper files to DMG (mac only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          ls -la dist || true
+          # electron-builder places DMG in dist; ensure helper files are present in project
+          cp -f build/Unquarantine.command dist/ || true
+          cp -f build/README.txt dist/ || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
