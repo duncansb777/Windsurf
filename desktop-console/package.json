@@ -28,10 +28,27 @@
         "filter": [
           "agentic-control-demo.html"
         ]
+      },
+      {
+        "from": "build",
+        "to": ".",
+        "filter": [
+          "Unquarantine.command",
+          "README.txt"
+        ]
       }
     ],
     "mac": {
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "target": "dmg",
+      "artifactName": "Agentic-Control-Console-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "additionalContents": [
+        { "path": "build/Unquarantine.command", "x": 120, "y": 360 },
+        { "path": "build/README.txt", "x": 120, "y": 470 },
+        { "path": "/Applications", "type": "link", "x": 420, "y": 200 }
+      ]
     },
     "win": {
       "target": "nsis"
