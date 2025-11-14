@@ -4,10 +4,16 @@ const fs = require('fs');
 
 function resolveAppHtml() {
   // In production, the HTML is copied to resources/app/ by electron-builder (extraFiles)
-  const prodPath = path.join(process.resourcesPath || '', 'app', 'agentic-control-demo.html');
+  const resPath = process.resourcesPath || '';
+  const candidates = [
+    path.join(resPath, 'app', 'agentic-control-demo.html'),
+    path.join(resPath, 'agentic-control-demo.html')
+  ];
   // In dev, load from the project root ../agentic-control-demo.html
   const devPath = path.resolve(__dirname, '..', 'agentic-control-demo.html');
-  if (fs.existsSync(prodPath)) return { path: prodPath, source: 'prod' };
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return { path: p, source: 'prod' };
+  }
   return { path: devPath, source: 'dev' };
 }
 
