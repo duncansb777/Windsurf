@@ -21,10 +21,10 @@
       "main.js",
       "preload.js"
     ],
-    "extraFiles": [
+    "extraResources": [
       {
         "from": "..",
-        "to": "app",
+        "to": ".",
         "filter": [
           "agentic-control-demo.html"
         ]
