@@ -247,7 +247,7 @@
           <input id="ha_recipient" placeholder="Recipient ref (e.g., Practitioner/prov-002)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
           <input id="ha_action" placeholder="Action (e.g., disclose)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
           <input id="ha_pou" placeholder="Purpose (e.g., treatment)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn" onclick="runHealthAgent('consent', { patient_id: val('ha_patient_con'), recipient_ref: val('ha_recipient'), action: val('ha_action'), purpose_of_use: val('ha_pou') })">Run Consent Check</button>
+          <button class="btn primary" onclick="runHealthAgent('consent', { patient_id: val('ha_patient_con'), recipient_ref: val('ha_recipient'), action: val('ha_action'), purpose_of_use: val('ha_pou') })">Run Consent Check</button>
         </div>
       </div>
 
@@ -813,17 +813,39 @@
           const pid = data?.discharge_event?.data?.patientId || 'unknown';
           const providers = data?.providers?.providers || [];
           const provList = Array.isArray(providers) ? providers.map(p=>p?.name||p?.id).filter(Boolean).slice(0,3).join(', ') : '';
+          const notes = (data?.discharge_event?.notes || data?.discharge_event?.data?.notes || '').toString().toLowerCase();
+          let risk = 'low';
+          if (/sepsis|icu|unstable|critical/.test(notes)) risk = 'high';
+          else if (/fall|dizzy|moderate|monitor/.test(notes)) risk = 'moderate';
           return `<p><strong>Discharge prepared</strong> for patient <code>${pid}</code>.</p>` +
+                 `<p><strong>Estimated risk:</strong> ${risk}</p>` +
                  (provList ? `<p>Nearby providers: ${provList}…</p>` : '');
         }
         if (kind === 'agenticReferral' && data) {
           const steps = data?.plan?.steps || data?.steps || [];
-          const summary = Array.isArray(steps) && steps.length ? steps.map((s,i)=>`${i+1}. ${s.title||s.action||'Step'}`).slice(0,5).join('<br/>') : 'LLM plan created.';
-          return `<p><strong>Agentic referral plan</strong> generated.</p><div>${summary}</div>`;
+          const summary = Array.isArray(steps) && steps.length
+            ? steps.map((s,i)=>`${i+1}. ${s.title||s.action||'Step'}${s.target? ' → '+s.target: ''}`).slice(0,6).join('<br/>')
+            : 'LLM plan created.';
+          const appts = data?.appointments || data?.bookings || [];
+          const apptLines = Array.isArray(appts) ? appts.map(a=>{
+            const who = a?.provider?.name || a?.recipient || a?.role || 'Clinician';
+            const when = a?.time || a?.slot || a?.eta || '';
+            return `• Follow-up with ${who}${when? ' at '+when: ''}`;
+          }).join('<br/>') : '';
+          return `<p><strong>Agentic referral plan</strong> generated.</p>` +
+                 `<div>${summary}</div>` +
+                 (apptLines ? `<p><strong>Bookings:</strong><br/>${apptLines}</p>` : '');
         }
         if (kind === 'consent' && data) {
           const decision = data?.decision || 'unknown';
-          return `<p><strong>Consent decision:</strong> ${decision}</p>`;
+          const allowed = data?.allowed || [];
+          const denied = data?.denied || [];
+          const why = data?.reason || data?.restrictions || '';
+          let html = `<p><strong>Consent decision:</strong> ${decision}</p>`;
+          if (Array.isArray(allowed) && allowed.length) html += `<p><strong>Allowed:</strong> ${allowed.join(', ')}</p>`;
+          if (Array.isArray(denied) && denied.length) html += `<p><strong>Not allowed:</strong> ${denied.join(', ')}</p>`;
+          if (why) html += `<p><strong>Why:</strong> ${typeof why==='string'? why : JSON.stringify(why)}</p>`;
+          return html;
         }
         if (kind === 'uber' && data) {
           const b = data?.booking || {};
