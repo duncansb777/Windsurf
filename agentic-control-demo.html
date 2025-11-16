@@ -724,6 +724,51 @@
       }
     };
 
+    // Patients: load from backend and populate dropdowns
+    let patientsLoaded = false;
+    async function loadPatients() {
+      try {
+        const res = await fetch((HEALTH_API.baseUrl || '') + '/patients');
+        const data = await res.json().catch(() => ({}));
+        const patients = (data && data.patients) || [];
+        const options = patients.map(p => ({ id: p.patient_id || p.mrn || p.ihi || '', label: (p.name || p.patient_id || '').toString() }));
+        const selectIds = ['ha_patient_sel','ha_patient_ref_sel','ha_patient_agentis_sel','ha_patient_con_sel'];
+        for (const sid of selectIds) {
+          const sel = document.getElementById(sid);
+          if (!sel) continue;
+          while (sel.options.length > 1) sel.remove(1);
+          for (const o of options) {
+            if (!o.id) continue;
+            const opt = document.createElement('option');
+            opt.value = o.id;
+            opt.textContent = o.label;
+            sel.appendChild(opt);
+          }
+        }
+        if (!patients.length) showToast('No patients found');
+        patientsLoaded = true;
+      } catch (e) {
+        showToast('Failed to load patients');
+      }
+    }
+
+    // Sync selects into the adjacent text inputs so run buttons work without typing
+    function bindSelectSync(selId, inputId) {
+      const s = document.getElementById(selId);
+      const i = document.getElementById(inputId);
+      if (s && i) s.addEventListener('change', () => { i.value = s.value; });
+    }
+    bindSelectSync('ha_patient_sel','ha_patient');
+    bindSelectSync('ha_patient_ref_sel','ha_patient_ref');
+    bindSelectSync('ha_patient_agentis_sel','ha_patient_agentis');
+    bindSelectSync('ha_patient_con_sel','ha_patient_con');
+
+    // Load on initial page load and when opening Health Agents
+    document.addEventListener('DOMContentLoaded', () => { loadPatients(); });
+    buttons.forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.view === 'healthAgents' && !patientsLoaded) loadPatients();
+    }));
+
     // Health Agents execution direct to backend
     async function runHealthAgent(kind, payload) {
       const ep = (HEALTH_API.endpoints || {})[kind];
