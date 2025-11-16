@@ -40,6 +40,8 @@
     .btn:active { transform: translateY(1px); }
 
     .grid { display: grid; gap: 16px; }
+    .link-cell { color: var(--brand); cursor: pointer; text-decoration: underline; }
+    .focus-glow { box-shadow: 0 0 0 3px rgba(95,37,159,0.25) !important; transition: box-shadow 0.3s ease; }
 
     .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
     .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
@@ -194,32 +196,18 @@
             <tr>
               <td>Patient Discharge Trigger</td>
               <td><span class="pill ok">Healthy</span></td>
-              <td>2</td>
-              <td>12</td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">2</td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">12</td>
               <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToAgent('Patient Discharge Trigger')">View</button>
-                <button class="btn" onclick="executeAgent('Patient Discharge Trigger')">Run</button>
-                <button class="btn" onclick="window.open(agentExecUrl('Patient Discharge Trigger'),'_blank')">Open Link</button>
-              </td>
-            </tr>
-            <tr>
-              <td>Referral Agent</td>
-              <td><span class="pill warn">Degraded</span></td>
-              <td>1</td>
-              <td>7</td>
-              <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToAgent('Referral Agent')">View</button>
-                <button class="btn" onclick="executeAgent('Referral Agent')">Run</button>
-                <button class="btn" onclick="window.open(agentExecUrl('Referral Agent'),'_blank')">Open Link</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">View</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Run</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Open Link</button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="row" style="margin-top:8px;">
-        <button class="btn" onclick="goToView('healthAgents')">Open Health Agents</button>
-      </div>
     </section>
 
   <!-- Health Agents (actions) -->
@@ -227,7 +215,7 @@
     <h2 style="margin:8px 0;">Health Agents</h2>
     <p style="color:var(--muted); margin-top:-8px;">Run common Health agent flows. These call the local Ownership Trigger backend directly from the app.</p>
     <div class="grid">
-      <div class="card">
+      <div class="card" id="ha_card_discharge">
         <h3>Patient Discharge Trigger</h3>
         <div class="row" style="gap:8px;">
           <select id="ha_patient_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
@@ -238,29 +226,18 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>Referral Agent</h3>
+      <div class="card" id="ha_card_agentic">
+        <h3>Agentic Referral (LLM plan)</h3>
         <div class="row" style="gap:8px;">
-          <select id="ha_patient_ref_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+          <select id="ha_patient_agentic_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
             <option value="">Select patient…</option>
           </select>
-          <input id="ha_patient_ref" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn" onclick="runHealthAgent('referral', { patient_id: val('ha_patient_ref') })">Run Referral</button>
+          <input id="ha_patient_agentic" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <button class="btn primary" onclick="runHealthAgent('agenticReferral', { patient_id: val('ha_patient_agentic'), context: {} })">Run Agentic Referral</button>
         </div>
       </div>
 
-      <div class="card">
-        <h3>Agentis Referral (LLM plan)</h3>
-        <div class="row" style="gap:8px;">
-          <select id="ha_patient_agentis_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
-            <option value="">Select patient…</option>
-          </select>
-          <input id="ha_patient_agentis" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn" onclick="runHealthAgent('agentisReferral', { patient_id: val('ha_patient_agentis'), context: {} })">Run Agentis Referral</button>
-        </div>
-      </div>
-
-      <div class="card">
+      <div class="card" id="ha_card_consent">
         <h3>Consent Check</h3>
         <div class="row" style="gap:8px;">
           <select id="ha_patient_con_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
@@ -274,17 +251,31 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3>Audit Check</h3>
+      <div class="card" id="ha_card_travel">
+        <h3>Travel (Uber Booking)</h3>
         <div class="row" style="gap:8px;">
-          <button class="btn" onclick="runHealthAgent('audit', {})">Run Audit Check</button>
+          <select id="ha_patient_travel_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
+            <option value="">Select patient…</option>
+          </select>
+          <input id="ha_patient_travel" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
+          <select id="ha_travel_purpose" style="max-width:260px;">
+            <option value="discharge_transport">Discharge transport</option>
+            <option value="appointment_transport">Appointment transport</option>
+          </select>
+          <button class="btn primary" onclick="runHealthAgent('uber', { patient_id: val('ha_patient_travel'), purpose: val('ha_travel_purpose') })">Book Uber</button>
         </div>
       </div>
     </div>
 
-    <div class="card" style="margin-top:12px;">
-      <h3>Result</h3>
-      <pre id="ha_result" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+    <div class="grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>Result (Messaging)</h3>
+        <pre id="ha_result_json" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+      </div>
+      <div class="card">
+        <h3>Result (Natural Language)</h3>
+        <div id="ha_result_text" style="padding:12px; line-height:1.5; color:#1f2937;"></div>
+      </div>
     </div>
   </section>
 
@@ -717,10 +708,9 @@
       baseUrl: 'http://127.0.0.1:8001',
       endpoints: {
         discharge: '/demo/discharge',
-        referral: '/demo/referral',
-        agentisReferral: '/demo/agentis-referral',
+        agenticReferral: '/demo/agentis-referral',
         consent: '/demo/consent-check',
-        audit: '/demo/audit-check'
+        uber: '/demo/uber'
       }
     };
 
@@ -732,7 +722,7 @@
         const data = await res.json().catch(() => ({}));
         const patients = (data && data.patients) || [];
         const options = patients.map(p => ({ id: p.patient_id || p.mrn || p.ihi || '', label: (p.name || p.patient_id || '').toString() }));
-        const selectIds = ['ha_patient_sel','ha_patient_ref_sel','ha_patient_agentis_sel','ha_patient_con_sel'];
+        const selectIds = ['ha_patient_sel','ha_patient_agentic_sel','ha_patient_con_sel','ha_patient_travel_sel'];
         for (const sid of selectIds) {
           const sel = document.getElementById(sid);
           if (!sel) continue;
@@ -759,9 +749,9 @@
       if (s && i) s.addEventListener('change', () => { i.value = s.value; });
     }
     bindSelectSync('ha_patient_sel','ha_patient');
-    bindSelectSync('ha_patient_ref_sel','ha_patient_ref');
-    bindSelectSync('ha_patient_agentis_sel','ha_patient_agentis');
+    bindSelectSync('ha_patient_agentic_sel','ha_patient_agentic');
     bindSelectSync('ha_patient_con_sel','ha_patient_con');
+    bindSelectSync('ha_patient_travel_sel','ha_patient_travel');
 
     // Load on initial page load and when opening Health Agents
     document.addEventListener('DOMContentLoaded', () => { loadPatients(); });
@@ -772,13 +762,13 @@
     // Health Agents execution direct to backend
     async function runHealthAgent(kind, payload) {
       const ep = (HEALTH_API.endpoints || {})[kind];
+      if (!ep) { showToast('Unknown action: ' + kind); return; }
       const url = (HEALTH_API.baseUrl || '') + ep;
       const label = {
         discharge: 'Discharge',
-        referral: 'Referral',
-        agentisReferral: 'Agentis Referral',
+        agenticReferral: 'Agentic Referral',
         consent: 'Consent Check',
-        audit: 'Audit Check'
+        uber: 'Travel Booking'
       }[kind] || kind;
       showToast('Running ' + label + '…');
       try {
@@ -786,9 +776,9 @@
         if (payload && !payload.patient_id) {
           const map = {
             discharge: 'ha_patient_sel',
-            referral: 'ha_patient_ref_sel',
-            agentisReferral: 'ha_patient_agentis_sel',
-            consent: 'ha_patient_con_sel'
+            agenticReferral: 'ha_patient_agentic_sel',
+            consent: 'ha_patient_con_sel',
+            uber: 'ha_patient_travel_sel'
           };
           const sid = map[kind];
           if (sid) {
@@ -802,13 +792,56 @@
           body: JSON.stringify(payload||{})
         });
         const data = await res.json().catch(() => ({}));
-        document.getElementById('ha_result').textContent = JSON.stringify(data, null, 2);
+        const jsonEl = document.getElementById('ha_result_json');
+        const textEl = document.getElementById('ha_result_text');
+        if (jsonEl) jsonEl.textContent = JSON.stringify(data, null, 2);
+        if (textEl) textEl.innerHTML = formatResult(kind, data);
         if (!res.ok) showToast(label + ' failed (HTTP ' + res.status + ')');
         else showToast(label + ' completed');
       } catch (e) {
-        document.getElementById('ha_result').textContent = String(e);
+        const jsonEl = document.getElementById('ha_result_json');
+        const textEl = document.getElementById('ha_result_text');
+        if (jsonEl) jsonEl.textContent = String(e);
+        if (textEl) textEl.textContent = '';
         showToast('Request error for ' + label);
       }
+    }
+
+    function formatResult(kind, data) {
+      try {
+        if (kind === 'discharge' && data) {
+          const pid = data?.discharge_event?.data?.patientId || 'unknown';
+          const providers = data?.providers?.providers || [];
+          const provList = Array.isArray(providers) ? providers.map(p=>p?.name||p?.id).filter(Boolean).slice(0,3).join(', ') : '';
+          return `<p><strong>Discharge prepared</strong> for patient <code>${pid}</code>.</p>` +
+                 (provList ? `<p>Nearby providers: ${provList}…</p>` : '');
+        }
+        if (kind === 'agenticReferral' && data) {
+          const steps = data?.plan?.steps || data?.steps || [];
+          const summary = Array.isArray(steps) && steps.length ? steps.map((s,i)=>`${i+1}. ${s.title||s.action||'Step'}`).slice(0,5).join('<br/>') : 'LLM plan created.';
+          return `<p><strong>Agentic referral plan</strong> generated.</p><div>${summary}</div>`;
+        }
+        if (kind === 'consent' && data) {
+          const decision = data?.decision || 'unknown';
+          return `<p><strong>Consent decision:</strong> ${decision}</p>`;
+        }
+        if (kind === 'uber' && data) {
+          const b = data?.booking || {};
+          return `<p><strong>Uber booking</strong> ${b.id || ''} ${b.status ? 'is '+b.status : ''}.</p>` +
+                 (b.eta_min ? `<p>ETA: ${b.eta_min} min</p>` : '') +
+                 (b.driver?.name ? `<p>Driver: ${b.driver.name} (${b.driver.rating||''})</p>` : '');
+        }
+      } catch {}
+      return '<p>Result available.</p>';
+    }
+
+    function focusCard(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      goToView('healthAgents');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('focus-glow');
+      setTimeout(()=> el.classList.remove('focus-glow'), 1200);
     }
 
     function goToAgent(name) {
