@@ -822,26 +822,30 @@
                  (provList ? `<p>Nearby providers: ${provList}…</p>` : '');
         }
         if (kind === 'agenticReferral' && data) {
-          const steps = data?.plan?.steps || data?.steps || [];
-          const summary = Array.isArray(steps) && steps.length
-            ? steps.map((s,i)=>`${i+1}. ${s.title||s.action||'Step'}${s.target? ' → '+s.target: ''}`).slice(0,6).join('<br/>')
-            : 'LLM plan created.';
-          const appts = data?.appointments || data?.bookings || [];
-          const apptLines = Array.isArray(appts) ? appts.map(a=>{
-            const who = a?.provider?.name || a?.recipient || a?.role || 'Clinician';
-            const when = a?.time || a?.slot || a?.eta || '';
-            return `• Follow-up with ${who}${when? ' at '+when: ''}`;
-          }).join('<br/>') : '';
-          return `<p><strong>Agentic referral plan</strong> generated.</p>` +
-                 `<div>${summary}</div>` +
-                 (apptLines ? `<p><strong>Bookings:</strong><br/>${apptLines}</p>` : '');
+          const risk = data?.handover?.risk_summary ? `<p><strong>Risk:</strong> ${data.handover.risk_summary}</p>` : '';
+          const execT = Array.isArray(data?.executed?.tasks) ? data.executed.tasks : [];
+          const execM = Array.isArray(data?.executed?.messages) ? data.executed.messages : [];
+          const tasks = execT.map(t => `• ${t?.input?.description || 'Task'} → ${t?.input?.owner_ref || ''}`).join('<br/>');
+          const msgs = execM.map(m => `• ${m?.input?.channel || 'msg'} to ${m?.input?.to_ref || ''} (${m?.input?.purpose_of_use || ''})`).join('<br/>');
+          const gpMsg = data?.gp_message ? `<p><strong>GP message:</strong> ${data.gp_message}</p>` : '';
+          const allowed = Array.isArray(data?.share_result?.allowed) ? data.share_result.allowed : [];
+          const denied = Array.isArray(data?.share_result?.denied) ? data.share_result.denied : [];
+          const allowLines = allowed.map(a => `• ${a.type}: ${a.to_ref || a.owner_ref || ''} (${a.purpose_of_use || a.description || ''})`).join('<br/>');
+          const denyLines = denied.map(a => `• ${a.type}: ${a.to_ref || a.owner_ref || ''} – denied${a.reason? ' ('+a.reason+')':''}`).join('<br/>');
+          return `<p><strong>Agentic referral executed.</strong></p>` +
+                 risk +
+                 (tasks ? `<p><strong>Tasks:</strong><br/>${tasks}</p>` : '') +
+                 (msgs ? `<p><strong>Messages:</strong><br/>${msgs}</p>` : '') +
+                 gpMsg +
+                 (allowLines ? `<p><strong>Sharing allowed:</strong><br/>${allowLines}</p>` : '') +
+                 (denyLines ? `<p><strong>Sharing denied:</strong><br/>${denyLines}</p>` : '');
         }
         if (kind === 'consent' && data) {
-          const decision = data?.decision || 'unknown';
+          const decisionVal = (typeof data?.decision === 'object') ? JSON.stringify(data.decision) : (data?.decision || 'unknown');
           const allowed = data?.allowed || [];
           const denied = data?.denied || [];
           const why = data?.reason || data?.restrictions || '';
-          let html = `<p><strong>Consent decision:</strong> ${decision}</p>`;
+          let html = `<p><strong>Consent decision:</strong> ${decisionVal}</p>`;
           if (Array.isArray(allowed) && allowed.length) html += `<p><strong>Allowed:</strong> ${allowed.join(', ')}</p>`;
           if (Array.isArray(denied) && denied.length) html += `<p><strong>Not allowed:</strong> ${denied.join(', ')}</p>`;
           if (why) html += `<p><strong>Why:</strong> ${typeof why==='string'? why : JSON.stringify(why)}</p>`;

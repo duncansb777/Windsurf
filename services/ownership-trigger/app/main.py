@@ -117,7 +117,25 @@ def demo_consent_check(req: ConsentCheckRequest):
         action=req.action,
         purpose_of_use=req.purpose_of_use,
     )
-    return {"patient_ref": patient_ref, "recipient_ref": req.recipient_ref, "action": req.action, "purpose_of_use": req.purpose_of_use, "decision": decision}
+    # Expand response for UI readability
+    allowed = []
+    denied = []
+    # Normalise decision into boolean when possible
+    allow_truthy = decision is True or (isinstance(decision, str) and decision.lower() in ("allow", "allowed", "permit", "permitted", "yes", "true"))
+    if allow_truthy:
+        allowed = [req.recipient_ref]
+    else:
+        denied = [req.recipient_ref]
+    return {
+        "patient_ref": patient_ref,
+        "recipient_ref": req.recipient_ref,
+        "action": req.action,
+        "purpose_of_use": req.purpose_of_use,
+        "decision": decision,
+        "allowed": allowed,
+        "denied": denied,
+        "restrictions": {},
+    }
 
 
 class AuditCheckResponse(BaseModel):
