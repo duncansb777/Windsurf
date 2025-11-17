@@ -99,6 +99,26 @@
       <div class="logo"></div>
       <div><strong>Agentic Control Console</strong></div>
     </div>
+
+  <!-- Fleet Quick Run Modal -->
+  <div id="quickRunModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header class="row" style="justify-content: space-between;">
+        <strong>Run Health Flow</strong>
+        <button class="btn" onclick="closeModal('quickRunModal')">Close</button>
+      </header>
+      <div>
+        <label>Select Patient</label>
+        <select id="fleet_patient_sel">
+          <option value="">Select patient…</option>
+        </select>
+      </div>
+      <footer>
+        <button class="btn" onclick="closeModal('quickRunModal')">Cancel</button>
+        <button class="btn primary" onclick="runQuickDischargeFlow()">Run Discharge + Agentic Referral</button>
+      </footer>
+    </div>
+  </div>
     <div id="nav">
       <button class="btn" data-view="fleet">Fleet</button>
       <button class="btn" data-view="escalations">Escalations</button>
@@ -200,7 +220,7 @@
               <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">12</td>
               <td class="row" style="gap:6px;">
                 <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">View</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Run</button>
+                <button class="btn" onclick="openQuickRun()">Run</button>
                 <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Open Link</button>
               </td>
             </tr>
@@ -722,7 +742,7 @@
         const data = await res.json().catch(() => ({}));
         const patients = (data && data.patients) || [];
         const options = patients.map(p => ({ id: p.patient_id || p.mrn || p.ihi || '', label: (p.name || p.patient_id || '').toString() }));
-        const selectIds = ['ha_patient_sel','ha_patient_agentic_sel','ha_patient_con_sel','ha_patient_travel_sel'];
+        const selectIds = ['ha_patient_sel','ha_patient_agentic_sel','ha_patient_con_sel','ha_patient_travel_sel','fleet_patient_sel'];
         for (const sid of selectIds) {
           const sel = document.getElementById(sid);
           if (!sel) continue;
@@ -792,19 +812,58 @@
           body: JSON.stringify(payload||{})
         });
         const data = await res.json().catch(() => ({}));
-        const jsonEl = document.getElementById('ha_result_json');
-        const textEl = document.getElementById('ha_result_text');
-        if (jsonEl) jsonEl.textContent = JSON.stringify(data, null, 2);
-        if (textEl) textEl.innerHTML = formatResult(kind, data);
+        writeResults(kind, data, !!window.__appendMode);
+        window.__appendMode = false;
         if (!res.ok) showToast(label + ' failed (HTTP ' + res.status + ')');
         else showToast(label + ' completed');
       } catch (e) {
-        const jsonEl = document.getElementById('ha_result_json');
-        const textEl = document.getElementById('ha_result_text');
-        if (jsonEl) jsonEl.textContent = String(e);
-        if (textEl) textEl.textContent = '';
+        writeResults(kind, { error: String(e) }, !!window.__appendMode);
+        window.__appendMode = false;
         showToast('Request error for ' + label);
       }
+    }
+
+    function writeResults(kind, data, append) {
+      const jsonEl = document.getElementById('ha_result_json');
+      const textEl = document.getElementById('ha_result_text');
+      if (!jsonEl || !textEl) return;
+      const title = { discharge:'Discharge', agenticReferral:'Agentic Referral', consent:'Consent', uber:'Travel' }[kind] || kind;
+      const jsonBlock = JSON.stringify(data, null, 2);
+      const nlBlock = `<h4 style="margin:0 0 6px;">${title}</h4>` + formatResult(kind, data);
+      if (!append) {
+        jsonEl.textContent = jsonBlock;
+        textEl.innerHTML = nlBlock;
+      } else {
+        jsonEl.textContent = (jsonEl.textContent ? (jsonEl.textContent + '\n\n') : '') + `=== ${title} ===\n` + jsonBlock;
+        textEl.innerHTML = textEl.innerHTML + '<hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">' + nlBlock;
+      }
+    }
+
+    function openQuickRun() {
+      if (!patientsLoaded) loadPatients();
+      openModal('quickRunModal');
+    }
+    async function runQuickDischargeFlow() {
+      const pid = sel('fleet_patient_sel');
+      if (!pid) { showToast('Please select a patient'); return; }
+      // Navigate and prefill
+      goToView('healthAgents');
+      const inputs = [
+        ['ha_patient', 'ha_patient_sel'],
+        ['ha_patient_agentic', 'ha_patient_agentic_sel']
+      ];
+      inputs.forEach(([inputId, selId]) => {
+        const i = document.getElementById(inputId);
+        const s = document.getElementById(selId);
+        if (i) i.value = pid;
+        if (s) s.value = pid;
+      });
+      // Run Discharge then Agentic Referral, appending second result
+      await runHealthAgent('discharge', { patient_id: pid });
+      window.__appendMode = true;
+      await runHealthAgent('agenticReferral', { patient_id: pid, context: {} });
+      closeModal('quickRunModal');
+      focusCard('ha_card_discharge');
     }
 
     function formatResult(kind, data) {
