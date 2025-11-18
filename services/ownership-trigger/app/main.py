@@ -234,6 +234,81 @@ def demo_referral(req: ReferralRequest):
     return {"referrals": referrals, "created_task": created_task}
 
 
+# ======================
+# Context management (for Prompt Studio UI)
+# ======================
+from fastapi import HTTPException
+
+CONTEXT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "context"))
+ALLOWED_SUBDIRS = {"specs", "architecture", "integrations", "constraints"}
+
+
+def _safe_context_path(subpath: str) -> str:
+    # Normalise and restrict to CONTEXT_ROOT and allowed subdirs
+    full = os.path.abspath(os.path.join(CONTEXT_ROOT, subpath))
+    if not full.startswith(CONTEXT_ROOT + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid path")
+    # Ensure first segment is allowed
+    parts = os.path.relpath(full, CONTEXT_ROOT).split(os.sep)
+    if not parts or parts[0] not in ALLOWED_SUBDIRS:
+        raise HTTPException(status_code=400, detail="Path not allowed")
+    return full
+
+
+class ContextAddRequest(BaseModel):
+    path: str  # e.g., specs/new_spec.md
+    content: str
+
+
+@app.get("/context/list")
+def context_list():
+    items = []
+    if not os.path.isdir(CONTEXT_ROOT):
+        return {"items": items}
+    for root, _, files in os.walk(CONTEXT_ROOT):
+        rel_root = os.path.relpath(root, CONTEXT_ROOT)
+        # skip root files; show only allowed subdirs
+        if rel_root == ".":
+            continue
+        top = rel_root.split(os.sep)[0]
+        if top not in ALLOWED_SUBDIRS:
+            continue
+        for f in files:
+            p_rel = os.path.join(rel_root, f)
+            p_abs = os.path.join(root, f)
+            try:
+                with open(p_abs, "r", encoding="utf-8", errors="ignore") as fh:
+                    sample = fh.read(4000)
+            except Exception:
+                sample = ""
+            items.append({"path": p_rel.replace("\\", "/"), "sample": sample})
+    return {"items": items}
+
+
+@app.get("/context/file")
+def context_file(path: str):
+    full = _safe_context_path(path)
+    if not os.path.exists(full):
+        raise HTTPException(status_code=404, detail="Not found")
+    try:
+        with open(full, "r", encoding="utf-8", errors="ignore") as fh:
+            return {"path": path, "content": fh.read()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/context/add")
+def context_add(req: ContextAddRequest):
+    full = _safe_context_path(req.path)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    try:
+        with open(full, "w", encoding="utf-8") as fh:
+            fh.write(req.content or "")
+        return {"ok": True, "path": req.path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class UberRequest(BaseModel):
     patient_id: Optional[str] = None
     purpose: Optional[str] = None

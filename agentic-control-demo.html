@@ -42,6 +42,7 @@
     .grid { display: grid; gap: 16px; }
     .link-cell { color: var(--brand); cursor: pointer; text-decoration: underline; }
     .focus-glow { box-shadow: 0 0 0 3px rgba(95,37,159,0.25) !important; transition: box-shadow 0.3s ease; }
+    .hl { background: var(--pill); color: var(--brand-dark); padding: 0 3px; border-radius: 3px; }
 
     .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
     .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel); box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
@@ -485,6 +486,7 @@
               <div class="tab active">Instructions</div>
               <div class="tab">Examples</div>
               <div class="tab">Policies</div>
+              <div class="tab">Context</div>
             </div>
             <div class="tabpanes" data-tabpanes="studio-tabs">
               <div class="tabpane active">
@@ -523,6 +525,31 @@
                 <div class="footer-actions">
                   <button class="btn" onclick="showToast('Policies edited (mock)')">Edit</button>
                   <button class="btn primary" onclick="showToast('Policy changes saved (mock)')">Save</button>
+                </div>
+              </div>
+              <div class="tabpane">
+                <div class="split">
+                  <div>
+                    <div class="card">
+                      <h4>Context Files</h4>
+                      <div id="ctxList" style="max-height:40vh; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:8px; background:#fff;"></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="card">
+                      <h4 id="ctxTitle">Preview</h4>
+                      <div id="ctxPreview" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; max-height:40vh; overflow:auto;"></div>
+                    </div>
+                    <div class="card" style="margin-top:12px;">
+                      <h4>Add Context File</h4>
+                      <div class="row">
+                        <input id="ctxPath" placeholder="e.g., specs/new_spec.md" style="max-width:360px;" />
+                        <button class="btn" onclick="addContextFile()">Add</button>
+                      </div>
+                      <label>Content</label>
+                      <textarea id="ctxContent" style="height:160px;"></textarea>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -974,6 +1001,9 @@
         panes.forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         panes[idx].classList.add('active');
+        if (group === 'studio-tabs' && tab.textContent === 'Context') {
+          loadContextList();
+        }
       }));
     }
     initTabs('agent-tabs');
@@ -1061,6 +1091,81 @@
       const strat = document.getElementById('rolloutStrategy').value;
       const region = document.getElementById('rolloutRegion').value;
       showToast('Deployment scheduled: Version v1.8.0 → Prod (' + strat + ') for ' + region + '.');
+    }
+
+    // =====================
+    // Context management UI
+    // =====================
+    async function loadContextList() {
+      try {
+        const res = await fetch((HEALTH_API.baseUrl||'') + '/context/list');
+        const data = await res.json();
+        const listEl = document.getElementById('ctxList');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        const items = (data && data.items) || [];
+        if (!items.length) { listEl.textContent = 'No context files found'; return; }
+        items.sort((a,b)=> a.path.localeCompare(b.path));
+        items.forEach(it => {
+          const btn = document.createElement('button');
+          btn.className = 'btn';
+          btn.style.display = 'block';
+          btn.style.width = '100%';
+          btn.style.textAlign = 'left';
+          btn.style.marginBottom = '6px';
+          btn.textContent = it.path;
+          btn.addEventListener('click', ()=> previewContext(it.path));
+          listEl.appendChild(btn);
+        });
+        // Auto-preview first item
+        if (items[0]) previewContext(items[0].path);
+      } catch(e) {
+        showToast('Failed to load context list');
+      }
+    }
+
+    function highlightSACSF(text) {
+      if (!text) return '';
+      // Highlight tokens like SACSF-XXX and headings
+      let html = text
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;');
+      html = html.replace(/(SACSF-[A-Z]{2}-?\d+)/g, '<span class="hl">$1<\/span>');
+      html = html.replace(/(^- \*\*SACSF[^\n]*\*\*)/gm, '<span class="hl">$1<\/span>');
+      return html;
+    }
+
+    async function previewContext(path) {
+      try {
+        const res = await fetch((HEALTH_API.baseUrl||'') + '/context/file?' + new URLSearchParams({ path }));
+        if (!res.ok) { showToast('Failed to load ' + path); return; }
+        const data = await res.json();
+        const title = document.getElementById('ctxTitle');
+        const prev = document.getElementById('ctxPreview');
+        if (title) title.textContent = 'Preview • ' + path;
+        if (prev) prev.innerHTML = highlightSACSF(data.content || '');
+      } catch (e) {
+        showToast('Error loading context file');
+      }
+    }
+
+    async function addContextFile() {
+      const path = val('ctxPath');
+      const content = document.getElementById('ctxContent')?.value || '';
+      if (!path) { showToast('Enter a path under specs/ architecture/ integrations/ or constraints/'); return; }
+      try {
+        const res = await fetch((HEALTH_API.baseUrl||'') + '/context/add', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, content })
+        });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok || !data.ok) { showToast('Failed to add file'); return; }
+        showToast('Context file added');
+        loadContextList();
+      } catch(e) {
+        showToast('Error adding file');
+      }
     }
   </script>
 </body>
