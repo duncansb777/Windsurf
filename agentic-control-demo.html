@@ -28,8 +28,8 @@
     .env .chip.active { background: var(--brand); border-color: var(--brand); color: white; }
 
     #nav { display: flex; gap: 8px; }
-    #nav button { border: 1px solid var(--border); padding: 10px 14px; cursor: pointer; background: #fff; border-radius: 10px; font-weight: 600; color: #1f2937; box-shadow: 0 1px 1px rgba(0,0,0,0.04); }
-    #nav button.active { background: var(--brand); color: white; border-color: var(--brand); box-shadow: 0 6px 14px rgba(95,37,159,0.22); }
+    #nav button { border: 1px solid var(--brand); padding: 10px 14px; cursor: pointer; background: var(--brand); border-radius: 10px; font-weight: 600; color: white; box-shadow: 0 6px 14px rgba(95,37,159,0.22); }
+    #nav button.active { background: var(--brand-dark); color: white; border-color: var(--brand-dark); box-shadow: 0 8px 18px rgba(95,37,159,0.28); }
 
     main { padding: 16px; max-width: 1200px; margin: 0 auto; }
     .view { display: none; }
@@ -57,8 +57,8 @@
     .pill.warn { background: #fffbeb; color: #854d0e; border-color: #fde68a; }
     .pill.err { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
 
-    .btn { border: 1px solid var(--border); background: #fff; color: #111827; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
-    .btn.primary { background: var(--brand); border-color: var(--brand); color: white; }
+    .btn { border: 1px solid var(--brand); background: var(--brand); color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn.primary { background: var(--brand-dark); border-color: var(--brand-dark); color: white; }
     .btn.ghost { background: transparent; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -125,6 +125,7 @@
       <button class="btn" data-view="escalations">Escalations</button>
       <button class="btn" data-view="agent">Agent Detail</button>
       <button class="btn" data-view="studio">Prompt Studio</button>
+      <button class="btn" data-view="billing">Billing Agents</button>
       <button class="btn" data-view="eval">Eval & Rollout</button>
       <button class="btn" data-view="healthAgents">Health Agents</button>
     </div>
@@ -230,6 +231,26 @@
       </div>
 
     </section>
+
+  <!-- Billing Agents (Meter Read) -->
+  <section id="billing" class="view">
+    <h2 style="margin:8px 0;">Billing Agents</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Meter Read Agent</h3>
+        <p style="color:var(--muted);">Upload a CSV of meter reads to process and validate. You can download a sample file.</p>
+        <div class="row" style="gap:8px; align-items: center;">
+          <button class="btn" onclick="downloadMeterSample()">Download Sample CSV</button>
+          <input type="file" id="meterFile" accept=".csv,text/csv" />
+          <button class="btn primary" onclick="uploadMeterReads()">Upload & Process</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Result</h3>
+        <pre id="meter_result_json" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+      </div>
+    </div>
+  </section>
 
   <!-- Health Agents (actions) -->
   <section id="healthAgents" class="view">
@@ -782,10 +803,10 @@
             sel.appendChild(opt);
           }
         }
-        if (!patients.length) showToast('No patients found');
+        if (!patients.length) { /* silent: may be okay in early startup */ }
         patientsLoaded = true;
       } catch (e) {
-        showToast('Failed to load patients');
+        // keep silent failure; UI can still accept typed IDs
       }
     }
 
@@ -801,7 +822,7 @@
     bindSelectSync('ha_patient_travel_sel','ha_patient_travel');
 
     // Load on initial page load and when opening Health Agents
-    document.addEventListener('DOMContentLoaded', () => { loadPatients(); });
+    document.addEventListener('DOMContentLoaded', () => { loadPatients(); loadContextList(); });
     buttons.forEach(b => b.addEventListener('click', () => {
       if (b.dataset.view === 'healthAgents' && !patientsLoaded) loadPatients();
     }));

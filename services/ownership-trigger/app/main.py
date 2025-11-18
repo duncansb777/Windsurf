@@ -49,6 +49,9 @@ def list_patients():
     except FileNotFoundError:
         # fallback to demo single patient
         rows = [{"patient_id": "123", "mrn": "MRN-123-LOCAL", "ihi": "8003608166690503", "name": "Jane Doe"}]
+    except Exception:
+        # any other error: still provide a fallback to avoid UI failure
+        rows = [{"patient_id": "123", "mrn": "MRN-123-LOCAL", "ihi": "8003608166690503", "name": "Jane Doe"}]
     return {"count": len(rows), "patients": rows}
 
 
@@ -237,7 +240,7 @@ def demo_referral(req: ReferralRequest):
 # ======================
 # Context management (for Prompt Studio UI)
 # ======================
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile, File
 
 CONTEXT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "context"))
 ALLOWED_SUBDIRS = {"specs", "architecture", "integrations", "constraints"}
@@ -331,3 +334,38 @@ def demo_uber(req: UberRequest):
         "vehicle": {"make": "Toyota", "model": "Camry", "plate": "UBR-123"},
     }
     return {"patient_id": pid, "purpose": purpose, "booking": booking}
+
+
+# ======================
+# Meter Read CSV ingest (demo)
+# ======================
+@app.get("/ccs/meter-reads/sample")
+def ccs_meter_reads_sample():
+    sample = (
+        "nmi,date,read_type,value\n"
+        "70011233,2025-10-01,ACTUAL,1234\n"
+        "70011233,2025-11-01,ESTIMATE,1270\n"
+        "70011999,2025-10-15,ACTUAL,4312\n"
+    )
+    return {"filename": "meter_reads_sample.csv", "content": sample}
+
+
+@app.post("/ccs/meter-reads/upload")
+def ccs_meter_reads_upload(file: UploadFile = File(...)):
+    try:
+        content = file.file.read().decode("utf-8", errors="ignore")
+        rdr = csv.DictReader(content.splitlines())
+        required = {"nmi", "date", "read_type", "value"}
+        if not required.issubset(set([c.strip() for c in rdr.fieldnames or []])):
+            raise HTTPException(status_code=400, detail="Invalid columns; expected nmi,date,read_type,value")
+        rows = list(rdr)
+        per_nmi = {}
+        for r in rows:
+            nmi = r.get("nmi", "").strip()
+            per_nmi.setdefault(nmi, 0)
+            per_nmi[nmi] += 1
+        return {"ok": True, "total": len(rows), "by_nmi": per_nmi}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
