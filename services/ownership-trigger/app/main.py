@@ -32,9 +32,12 @@ def health():
     return {"status": "ok"}
 
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+
 @app.get("/patients")
 def list_patients():
-    path = os.path.join(os.getcwd(), "data", "csv", "patient.csv")
+    path = os.path.join(BASE_DIR, "data", "csv", "patient.csv")
     rows: List[dict] = []
     try:
         with open(path, newline="") as f:

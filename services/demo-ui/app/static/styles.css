@@ -9,8 +9,8 @@ main.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}
 @media (max-width: 900px){main.grid{grid-template-columns:1fr}}
 section.panel{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:16px;min-height:180px}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-button{appearance:none;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 14px;margin-right:10px;cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,0.2)}
-button:hover{background:#1d4ed8}
+button{appearance:none;background:#e5e7eb;color:#7e22ce;border:none;border-radius:8px;padding:10px 14px;margin-right:10px;cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,0.15)}
+button:hover{background:#d1d5db}
 .status{margin-top:12px;color:#94a3b8}
 .hidden{display:none}
 .banner{padding:10px 12px;border-radius:8px;margin-bottom:10px}

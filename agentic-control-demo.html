@@ -28,8 +28,8 @@
     .env .chip.active { background: var(--brand); border-color: var(--brand); color: white; }
 
     #nav { display: flex; gap: 8px; }
-    #nav button { border: 1px solid var(--brand); padding: 10px 14px; cursor: pointer; background: var(--brand); border-radius: 10px; font-weight: 600; color: white; box-shadow: 0 6px 14px rgba(95,37,159,0.22); }
-    #nav button.active { background: var(--brand-dark); color: white; border-color: var(--brand-dark); box-shadow: 0 8px 18px rgba(95,37,159,0.28); }
+    #nav button { border: 1px solid #d1d5db; padding: 10px 14px; cursor: pointer; background: #e5e7eb; border-radius: 10px; font-weight: 600; color: var(--brand); box-shadow: 0 1px 0 rgba(0,0,0,0.08); }
+    #nav button.active { background: #d1d5db; color: var(--brand-dark); border-color: #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.12); }
 
     main { padding: 16px; max-width: 1200px; margin: 0 auto; }
     .view { display: none; }
@@ -248,6 +248,29 @@
       <div class="card">
         <h3>Result</h3>
         <pre id="meter_result_json" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+      </div>
+    </div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>CoO / Billing Flows (Embedded)</h3>
+        <p style="color:var(--muted);">Run Change-of-Ownership and billing flows directly against the shared CSV data (mock MCP view).</p>
+        <div class="row" style="gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <button class="btn" onclick="runCooFlow('address-standardize')">Address Standardize</button>
+          <button class="btn" onclick="runCooFlow('ownership')">Ownership (LLM Route)</button>
+          <button class="btn" onclick="runCooFlow('ownership-deterministic')">Ownership (Deterministic)</button>
+          <button class="btn" onclick="runCooFlow('special-read')">Special Read Scheduler</button>
+          <button class="btn" onclick="runCooFlow('bill-transfer')">Bill Transfer</button>
+          <button class="btn" onclick="runCooFlow('reset')">Reset CoO Demo</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>CoO Result (JSON + Artifacts)</h3>
+        <pre id="coo_result_json" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
+      </div>
+      <div class="card">
+        <h3>CoO Result (Natural Language)</h3>
+        <div id="coo_result_text" style="padding:12px; line-height:1.5; color:#1f2937;"></div>
       </div>
     </div>
   </section>
@@ -771,6 +794,39 @@
       }
     }
 
+    // CoO / Billing flows wired to embedded coo-demo service
+    async function runCooFlow(kind) {
+      const ep = (COO_API.endpoints || {})[kind];
+      if (!ep) { showToast('Unknown CoO flow: ' + kind); return; }
+      const url = (COO_API.baseUrl || '') + ep;
+      const label = {
+        'address-standardize': 'Address Standardize',
+        'ownership': 'Ownership (LLM Route)',
+        'ownership-deterministic': 'Ownership (Deterministic)',
+        'special-read': 'Special Read Scheduler',
+        'bill-transfer': 'Bill Transfer',
+        'reset': 'Reset CoO Demo'
+      }[kind] || kind;
+      showToast('Running CoO flow: ' + label + '…');
+      try {
+        const res = await fetch(url, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        const jsonEl = document.getElementById('coo_result_json');
+        const textEl = document.getElementById('coo_result_text');
+        if (jsonEl) jsonEl.textContent = JSON.stringify(data, null, 2);
+        if (textEl) textEl.innerHTML = formatCooResult(kind, data);
+        if (!res.ok) showToast(label + ' failed (HTTP ' + res.status + ')');
+        else showToast(label + ' completed');
+      } catch (e) {
+        const jsonEl = document.getElementById('coo_result_json');
+        const textEl = document.getElementById('coo_result_text');
+        const errObj = { error: String(e) };
+        if (jsonEl) jsonEl.textContent = JSON.stringify(errObj, null, 2);
+        if (textEl) textEl.innerHTML = '<p>CoO flow failed.</p>';
+        showToast('Request error for CoO flow: ' + label);
+      }
+    }
+
     // Health API config (Ownership Trigger backend)
     const HEALTH_API = {
       baseUrl: 'http://127.0.0.1:8001',
@@ -779,6 +835,19 @@
         agenticReferral: '/demo/agentis-referral',
         consent: '/demo/consent-check',
         uber: '/demo/uber'
+      }
+    };
+
+    // Embedded CoO/Billing demo service (reads shared CSV data; Option B)
+    const COO_API = {
+      baseUrl: 'http://127.0.0.1:8003', // coo-demo service
+      endpoints: {
+        'address-standardize': '/coo/address-standardize',
+        'ownership': '/coo/ownership',
+        'ownership-deterministic': '/coo/ownership-deterministic',
+        'special-read': '/coo/special-read',
+        'bill-transfer': '/coo/bill-transfer',
+        'reset': '/coo/reset'
       }
     };
 
@@ -966,6 +1035,57 @@
         }
       } catch {}
       return '<p>Result available.</p>';
+    }
+
+    function formatCooResult(kind, data) {
+      try {
+        const res = data && (data.result || data.output || data);
+        const artifacts = Array.isArray(data && data.artifacts) ? data.artifacts : [];
+        const tool = (res && res.tool) || `coo.${kind}`;
+        const out = (res && (res.output || res.summary || res.result)) || res || {};
+        const summary = out.summary || (typeof out === 'string' ? out : 'CoO flow completed.');
+        let html = `<p><strong>${tool}</strong></p><p>${summary}</p>`;
+
+        // Domain-specific hints per flow
+        if (tool === 'coo.address-standardize') {
+          html += '<p>This run inspects Property.csv and prepares a cleaned view of property addresses that downstream agents can consume.</p>';
+        } else if (tool === 'coo.ownership') {
+          html += '<p>This approximates a change-of-ownership run, correlating ownership history with the current property table to show how many properties would be impacted.</p>';
+        } else if (tool === 'coo.ownership-deterministic') {
+          html += '<p>This simulates a deterministic ownership apply, useful for replaying a known scenario without LLM routing.</p>';
+        } else if (tool === 'coo.special-read') {
+          html += '<p>This represents the special-read scheduler, turning trigger rows into a planned meter-read schedule CSV that a field ops agent could act on.</p>';
+        } else if (tool === 'coo.bill-transfer') {
+          html += '<p>This represents a bill-transfer pass, combining the current billing snapshot with any transfer rows to produce a bill file an agent could send or escalate.</p>';
+        } else if (tool === 'coo.reset') {
+          html += '<p>This is a no-op reset in the shared-data demo: it reports which core CSVs are present rather than mutating them.</p>';
+        }
+        if (typeof out.history_rows === 'number' || typeof out.property_rows === 'number') {
+          const h = out.history_rows != null ? out.history_rows : '?';
+          const p = out.property_rows != null ? out.property_rows : '?';
+          html += `<p>History rows: ${h}, Property rows: ${p}.</p>`;
+        }
+        if (typeof out.triggers === 'number' || typeof out.scheduled_reads === 'number') {
+          const t = out.triggers != null ? out.triggers : '?';
+          const s = out.scheduled_reads != null ? out.scheduled_reads : '?';
+          html += `<p>Special read triggers: ${t}, scheduled reads: ${s}.</p>`;
+        }
+        if (typeof out.billing_rows === 'number' || typeof out.transfer_rows === 'number') {
+          const b = out.billing_rows != null ? out.billing_rows : '?';
+          const tr = out.transfer_rows != null ? out.transfer_rows : '?';
+          html += `<p>Billing rows: ${b}, transfer rows: ${tr}.</p>`;
+        }
+        if (Array.isArray(out.sample_properties) && out.sample_properties.length) {
+          html += `<p><strong>Sample properties:</strong> showing ${out.sample_properties.length} of ${out.total_properties || ''}.</p>`;
+        }
+        if (artifacts.length) {
+          const list = artifacts.map(a => `• ${a.name} (${a.type})`).join('<br/>');
+          html += `<p><strong>Artifacts:</strong><br/>${list}</p>`;
+        }
+        return html;
+      } catch (e) {
+        return '<p>CoO result available.</p>';
+      }
     }
 
     function focusCard(id) {
