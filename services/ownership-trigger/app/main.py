@@ -5,6 +5,7 @@ import os
 import csv
 import time
 from typing import Optional, List
+from .ccs_tools import ccs_get_meter_reads
 from .agentis_demo import run_demo as agentis_run_demo
 from .agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
@@ -163,6 +164,42 @@ def demo_audit_check():
     # 3) Query audit trail
     audit = epic.call("epic.audit.search", {"actor_ref": "Agent/demo-client", "entity_ref": None, "action": None})
     return {"write_back_id": wb.get("id"), "alert_id": alert.get("alert_id"), "audit": audit}
+
+
+# ======================
+# CCS MCP Tools (CCS API)
+# ======================
+class MeterReadsRequest(BaseModel):
+    nmi: str
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    user: Optional[str] = None
+    purpose_of_use: Optional[str] = None
+
+
+class MeterRead(BaseModel):
+    read_type: str
+    date: str
+    value: float
+
+
+class MeterReadsResponse(BaseModel):
+    reads: List[MeterRead]
+
+
+@app.post("/ccs/get-meter-reads", response_model=MeterReadsResponse)
+def api_ccs_get_meter_reads(req: MeterReadsRequest):
+    """MCP tool endpoint: Retrieve meter reads for a given NMI/date range.
+    SACSF controls enforced by ccs_tools module (AC-1, AC-3, LG-1).
+    """
+    out = ccs_get_meter_reads(
+        nmi=req.nmi,
+        from_date=req.from_date,
+        to_date=req.to_date,
+        user=req.user,
+        purpose_of_use=req.purpose_of_use,
+    )
+    return out
 
 
 class ReferralDemoResponse(BaseModel):
