@@ -1,6 +1,63 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
+
+// Simple process handle for the internal backend (Ownership Trigger + MCP shims)
+let backendProc = null;
+
+function startBackend() {
+  if (backendProc) return; // already running
+
+  // Resolve project root from the desktop-console folder
+  const projectRoot = path.resolve(__dirname, '..');
+
+  // Command to run the FastAPI backend that fronts all MCP mocks + CSV demo data.
+  // This is the same service the HTML calls via HEALTH_API.baseUrl.
+  const pythonCmd = process.env.HEALTH_PYTHON || 'python3';
+  const args = [
+    '-m',
+    'uvicorn',
+    'services.ownership-trigger.app.main:app',
+    '--port',
+    process.env.HEALTH_BACKEND_PORT || '8001',
+  ];
+
+  backendProc = spawn(pythonCmd, args, {
+    cwd: projectRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      // Ensure CSV-based CoO demo data is available to the mock MCP if overridden.
+      // Default path is already wired in the Python code; this lets advanced users override it.
+      COO_DATA_DIR: process.env.COO_DATA_DIR || process.env.HEALTH_COO_DATA_DIR || '',
+    },
+  });
+
+  backendProc.on('exit', (code, signal) => {
+    backendProc = null;
+    // In dev we may want to see failures in the console; avoid UI popups here.
+    console.log('[backend] exited', { code, signal });
+  });
+
+  backendProc.stdout.on('data', (data) => {
+    console.log('[backend]', data.toString().trim());
+  });
+
+  backendProc.stderr.on('data', (data) => {
+    console.error('[backend:err]', data.toString().trim());
+  });
+}
+
+function stopBackend() {
+  if (!backendProc) return;
+  try {
+    backendProc.kill();
+  } catch (e) {
+    // ignore
+  }
+  backendProc = null;
+}
 
 function resolveAppHtml() {
   // In production, the HTML is copied to resources/app/ by electron-builder (extraFiles)
@@ -81,6 +138,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Start internal backend so the HTML UI can call HEALTH_API/CoO endpoints
+  startBackend();
+
   createWindow();
 
   app.on('activate', () => {
@@ -90,4 +150,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  // Ensure the internal backend is stopped when the app exits
+  stopBackend();
 });
