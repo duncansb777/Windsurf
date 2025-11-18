@@ -5,10 +5,12 @@ from typing import Any, Dict, List
 import os
 import csv
 
-# Shared data directory (Option B): default to agent-orchestration-service/app, override via COO_DATA_DIR
+# Shared data directory (Option B): default to sibling agent-orchestration-service/app
+# relative to the Health project root, override via COO_DATA_DIR if needed.
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 COO_DATA_DIR = os.environ.get(
     "COO_DATA_DIR",
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "agent-orchestration-service", "app")),
+    os.path.abspath(os.path.join(PROJECT_ROOT, "..", "agent-orchestration-service", "app")),
 )
 
 

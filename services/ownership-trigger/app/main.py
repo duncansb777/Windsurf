@@ -9,7 +9,7 @@ from .ccs_tools import ccs_get_meter_reads
 from .agentis_demo import run_demo as agentis_run_demo
 from .agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
-from libs.common.mcp_client import make_epic_client, make_hca_client
+from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client
 
 app = FastAPI(title="Ownership Trigger Agent")
 app.add_middleware(
@@ -245,7 +245,9 @@ def demo_referral(req: ReferralRequest):
 # ======================
 from fastapi import HTTPException, UploadFile, File
 
-CONTEXT_ROOT = os.path.abspath(os.path.join(os.getcwd(), "context"))
+# Resolve context folder relative to project root, not cwd, so it works
+# when the service is started from different environments (desktop app, uvicorn, etc.).
+CONTEXT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "context"))
 ALLOWED_SUBDIRS = {"specs", "architecture", "integrations", "constraints"}
 
 
@@ -301,6 +303,58 @@ def context_file(path: str):
             return {"path": path, "content": fh.read()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ======================
+# CoO / Billing MCP wrappers (for Billing screen in app)
+# ======================
+
+
+class CoOFlowResponse(BaseModel):
+    tool: str
+    arguments: dict
+    output: dict
+
+
+def _coo_call(method: str, params: dict | None = None) -> CoOFlowResponse:
+    client = make_coo_client()
+    res = client.call(method, params or {})
+    # Normalise into a simple pydantic model
+    return CoOFlowResponse(
+        tool=res.get("tool", method),
+        arguments=res.get("arguments", {}),
+        output=res.get("output", {}),
+    )
+
+
+@app.post("/coo/address-standardize", response_model=CoOFlowResponse)
+def coo_address_standardize_http():
+    return _coo_call("coo.address-standardize")
+
+
+@app.post("/coo/ownership", response_model=CoOFlowResponse)
+def coo_ownership_http():
+    return _coo_call("coo.ownership")
+
+
+@app.post("/coo/ownership-deterministic", response_model=CoOFlowResponse)
+def coo_ownership_deterministic_http():
+    return _coo_call("coo.ownership-deterministic")
+
+
+@app.post("/coo/special-read", response_model=CoOFlowResponse)
+def coo_special_read_http():
+    return _coo_call("coo.special-read")
+
+
+@app.post("/coo/bill-transfer", response_model=CoOFlowResponse)
+def coo_bill_transfer_http():
+    return _coo_call("coo.bill-transfer")
+
+
+@app.post("/coo/reset", response_model=CoOFlowResponse)
+def coo_reset_http():
+    return _coo_call("coo.reset")
 
 
 @app.post("/context/add")

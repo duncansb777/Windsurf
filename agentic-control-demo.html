@@ -838,9 +838,11 @@
       }
     };
 
-    // Embedded CoO/Billing demo service (reads shared CSV data; Option B)
+    // CoO / Billing via MCP-backed backend (Ownership Trigger service wraps CoO MCP tools)
     const COO_API = {
-      baseUrl: 'http://127.0.0.1:8003', // coo-demo service
+      // Reuse HEALTH_API.baseUrl so the app only talks to a single backend; that backend
+      // uses a mock MCP server (mcp-coo-mock) to execute the actual CoO tools.
+      get baseUrl() { return HEALTH_API.baseUrl || ''; },
       endpoints: {
         'address-standardize': '/coo/address-standardize',
         'ownership': '/coo/ownership',

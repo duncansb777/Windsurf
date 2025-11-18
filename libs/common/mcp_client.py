@@ -42,3 +42,8 @@ def make_epic_client() -> MCPClient:
 def make_hca_client() -> MCPClient:
     cmd = os.getenv("MCP_HCA_CMD", "python3 mcp/mcp-hca-mock/main.py")
     return MCPClient(cmd)
+
+
+def make_coo_client() -> MCPClient:
+    cmd = os.getenv("MCP_COO_CMD", "python3 mcp/mcp-coo-mock/main.py")
+    return MCPClient(cmd)
