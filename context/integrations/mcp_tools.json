@@ -1,0 +1,36 @@
+{
+  "tools": [
+    {
+      "name": "ccs.get_meter_reads",
+      "description": "Retrieve meter reads for a given NMI/date range",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "nmi": {"type": "string"},
+          "from_date": {"type": "string", "format": "date"},
+          "to_date": {"type": "string", "format": "date"}
+        },
+        "required": ["nmi"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "reads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "read_type": {"type": "string"},
+                "date": {"type": "string", "format": "date"},
+                "value": {"type": "number"}
+              },
+              "required": ["read_type", "date", "value"]
+            }
+          }
+        },
+        "required": ["reads"]
+      },
+      "constraints": ["SACSF-AC-1", "SACSF-AC-3", "SACSF-LG-1"]
+    }
+  ]
+}

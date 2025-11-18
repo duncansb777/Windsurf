@@ -1,0 +1,66 @@
+version: 1.0
+spec:
+  name: CCS Change of Ownership
+  description: Specification for CCS Change-of-Ownership (CoO) process covering triggers, validations, MCP tools, and outputs.
+  owners:
+    - team: DXC Agentic Engine
+  references:
+    - ../constraints/sacsf_controls.md
+    - ../integrations/ccs_api_contracts.md
+  triggers:
+    - name: confirmed_sale
+      source: ccs
+      payload_schema:
+        account_id: string
+        nmi: string
+        effective_date: date
+        customer_id_outgoing: string
+        customer_id_incoming: string
+  validations:
+    - id: V-001
+      description: Ensure no open billing exceptions for account
+      rule_ref: ../specs/billing_exception_rules.md#no-open-blockers
+    - id: V-002
+      description: Validate meter read recency within X days
+      rule_ref: ../integrations/ccs_api_contracts.md#meter-reads
+  mcp_tools:
+    - name: ccs.get_meter_reads
+      intent: Retrieve last actual and estimate reads for NMI
+      input:
+        nmi: string
+        from_date: date
+        to_date: date
+      output:
+        reads:
+          - read_type: [ACTUAL, ESTIMATE]
+            date: date
+            value: number
+      constraints:
+        - sacsf: AC-1, AC-3, LG-1
+    - name: ccs.create_special_read_order
+      intent: Create a special read task with CCS
+      input:
+        nmi: string
+        due_date: date
+      output:
+        order_id: string
+  outputs:
+    - name: handover_summary
+      schema:
+        account_id: string
+        nmi: string
+        last_read_date: date
+        last_read_value: number
+        pending_tasks:
+          - order_id: string
+            type: string
+            status: string
+  test_vectors:
+    - name: standard-transfer
+      input:
+        account_id: ACC-001
+        nmi: 70011233
+        effective_date: 2025-12-01
+      expect:
+        last_read_date: any
+        pending_tasks: any
