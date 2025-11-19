@@ -587,7 +587,13 @@
                     <div class="card" style="margin-top:12px;">
                       <h4>Add Context File</h4>
                       <div class="row">
-                        <input id="ctxPath" placeholder="e.g., specs/new_spec.md" style="max-width:360px;" />
+                        <select id="ctxDir" style="max-width:180px;">
+                          <option value="specs">specs/</option>
+                          <option value="architecture">architecture/</option>
+                          <option value="integrations">integrations/</option>
+                          <option value="constraints">constraints/</option>
+                        </select>
+                        <input id="ctxFile" placeholder="new_spec.md" style="max-width:260px;" />
                         <button class="btn" onclick="addContextFile()">Add</button>
                       </div>
                       <label>Content</label>
@@ -1294,9 +1300,11 @@
     }
 
     async function addContextFile() {
-      const path = val('ctxPath');
+      const dir = (document.getElementById('ctxDir')?.value || '').trim();
+      const file = (document.getElementById('ctxFile')?.value || '').trim();
       const content = document.getElementById('ctxContent')?.value || '';
-      if (!path) { showToast('Enter a path under specs/ architecture/ integrations/ or constraints/'); return; }
+      if (!dir || !file) { showToast('Choose a folder and enter a filename'); return; }
+      const path = dir + '/' + file.replace(/^\/+/, '');
       try {
         const res = await fetch((HEALTH_API.baseUrl||'') + '/context/add', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -12,9 +12,16 @@ function startBackend() {
   // Resolve project root from the desktop-console folder
   const projectRoot = path.resolve(__dirname, '..');
 
-  // Command to run the FastAPI backend that fronts all MCP mocks + CSV demo data.
-  // This is the same service the HTML calls via HEALTH_API.baseUrl.
-  const pythonCmd = process.env.HEALTH_PYTHON || 'python3';
+  // Prefer the repo-local virtualenv Python if present, so uvicorn and
+  // dependencies are loaded from the same environment the app uses.
+  const venvDir = path.join(projectRoot, '.venv');
+  const venvPython = process.platform === 'win32'
+    ? path.join(venvDir, 'Scripts', 'python.exe')
+    : path.join(venvDir, 'bin', 'python');
+
+  const pythonCmd = fs.existsSync(venvPython)
+    ? venvPython
+    : (process.env.HEALTH_PYTHON || 'python3');
   const args = [
     '-m',
     'uvicorn',
