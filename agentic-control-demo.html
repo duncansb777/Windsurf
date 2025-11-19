@@ -593,11 +593,19 @@
                           <option value="integrations">integrations/</option>
                           <option value="constraints">constraints/</option>
                         </select>
+                        <input id="ctxUpload" type="file" multiple style="max-width:260px;" />
+                        <button class="btn" onclick="uploadContextFiles()">Upload Selected</button>
+                      </div>
+                      <div style="margin-top:8px;">
+                        <label for="ctxExistingFile" style="display:block; font-size:12px; color:var(--muted); margin-bottom:4px;">Existing files in folder</label>
+                        <select id="ctxExistingFile" style="width:100%; max-width:360px;"></select>
+                      </div>
+                      <label style="margin-top:8px; display:block;">Or paste content to create a new file</label>
+                      <textarea id="ctxContent" placeholder="Optional: paste text here and click Add to create a new file" style="height:160px;"></textarea>
+                      <div class="row" style="margin-top:6px;">
                         <input id="ctxFile" placeholder="new_spec.md" style="max-width:260px;" />
                         <button class="btn" onclick="addContextFile()">Add</button>
                       </div>
-                      <label>Content</label>
-                      <textarea id="ctxContent" style="height:160px;"></textarea>
                     </div>
                   </div>
                 </div>
@@ -1253,6 +1261,7 @@
         if (!listEl) return;
         listEl.innerHTML = '';
         const items = (data && data.items) || [];
+        window.__ctxItems = items;
         if (!items.length) { listEl.textContent = 'No context files found'; return; }
         items.sort((a,b)=> a.path.localeCompare(b.path));
         items.forEach(it => {
@@ -1268,6 +1277,7 @@
         });
         // Auto-preview first item
         if (items[0]) previewContext(items[0].path);
+        updateCtxExistingFileOptions();
       } catch(e) {
         showToast('Failed to load context list');
       }
@@ -1317,6 +1327,79 @@
       } catch(e) {
         showToast('Error adding file');
       }
+    }
+
+    async function uploadContextFiles() {
+      const dir = (document.getElementById('ctxDir')?.value || '').trim();
+      const input = document.getElementById('ctxUpload');
+      if (!dir) { showToast('Choose a folder first'); return; }
+      if (!input || !input.files || !input.files.length) { showToast('Select one or more files'); return; }
+
+      const files = Array.from(input.files);
+      for (const f of files) {
+        try {
+          const text = await f.text();
+          const path = dir + '/' + f.name.replace(/^\/+/, '');
+          const res = await fetch((HEALTH_API.baseUrl||'') + '/context/add', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path, content: text })
+          });
+          const data = await res.json().catch(()=>({}));
+          if (!res.ok || !data.ok) {
+            showToast('Failed to add ' + f.name);
+            continue;
+          }
+        } catch (e) {
+          showToast('Error uploading ' + f.name);
+        }
+      }
+      showToast('Context files uploaded');
+      loadContextList();
+    }
+
+    function updateCtxExistingFileOptions() {
+      const dir = (document.getElementById('ctxDir')?.value || '').trim();
+      const selEl = document.getElementById('ctxExistingFile');
+      const items = window.__ctxItems || [];
+      if (!selEl) return;
+
+      selEl.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = dir ? 'Select file…' : 'Select folder first';
+      selEl.appendChild(placeholder);
+
+      if (!dir) return;
+      const prefix = dir + '/';
+      items
+        .filter(it => typeof it.path === 'string' && it.path.startsWith(prefix))
+        .forEach(it => {
+          const opt = document.createElement('option');
+          opt.value = it.path;
+          // Show just the filename relative to the folder
+          opt.textContent = it.path.slice(prefix.length);
+          selEl.appendChild(opt);
+        });
+    }
+
+    const ctxDirEl = document.getElementById('ctxDir');
+    if (ctxDirEl) {
+      ctxDirEl.addEventListener('change', () => {
+        updateCtxExistingFileOptions();
+      });
+    }
+
+    const ctxExistingEl = document.getElementById('ctxExistingFile');
+    if (ctxExistingEl) {
+      ctxExistingEl.addEventListener('change', async () => {
+        const path = ctxExistingEl.value;
+        if (!path) return;
+        previewContext(path);
+        // Also pre-fill manual edit fields
+        const fileName = path.split('/').slice(1).join('/') || path;
+        const fileInput = document.getElementById('ctxFile');
+        if (fileInput) fileInput.value = fileName;
+      });
     }
   </script>
 </body>
