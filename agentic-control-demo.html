@@ -341,6 +341,11 @@
         <h3>Result (Natural Language)</h3>
         <div id="ha_result_text" style="padding:12px; line-height:1.5; color:#1f2937;"></div>
       </div>
+      <div class="card">
+        <h3>Execution Graph (Agent Flows)</h3>
+        <p style="color:var(--muted); margin-top:-4px; font-size:12px;">Each run of a Health use case appends a new flow showing UI → backend → MCP tools → LLM planners and actions.</p>
+        <div id="ha_graph" style="max-height:40vh; overflow:auto; padding:8px; background:#f9fafb; border-radius:8px; font-size:12px;"></div>
+      </div>
     </div>
   </section>
 
@@ -808,6 +813,90 @@
       }
     }
 
+    const EXEC_GRAPH_TEMPLATES = {
+      discharge: [
+        'Health UI',
+        'Ownership Trigger API (/demo/discharge)',
+        'MCP: Epic (discharge_event, patient_bundle)',
+        'MCP: HCA (directory search)',
+        'LLM Planner / Risk Scoring',
+        'Tasks & Notifications'
+      ],
+      agenticReferral: [
+        'Health UI',
+        'Ownership Trigger API (/demo/agentis-referral)',
+        'MCP: Epic (clinical data)',
+        'MCP: HCA (providers & consent)',
+        'LLM Agentic Planner',
+        'Tasks • Messages • Sharing Decisions'
+      ],
+      consent: [
+        'Health UI',
+        'Ownership Trigger API (/demo/consent-check)',
+        'MCP: Policy Engine',
+        'LLM/Rules Evaluation',
+        'Allow / Deny Decision'
+      ],
+      uber: [
+        'Health UI',
+        'Ownership Trigger API (/demo/uber)',
+        'LLM / Rules (purpose selection)',
+        'Transport Booking Service'
+      ]
+    };
+
+    function appendExecutionGraph(kind, payload, data) {
+      const panel = document.getElementById('ha_graph');
+      if (!panel) return;
+      const nodes = EXEC_GRAPH_TEMPLATES[kind] || ['Health UI', 'Ownership Trigger API', 'Backend Logic'];
+      const ts = new Date();
+      const label = {
+        discharge: 'Discharge',
+        agenticReferral: 'Agentic Referral',
+        consent: 'Consent Check',
+        uber: 'Travel (Uber)'
+      }[kind] || kind;
+      const runId = ts.toLocaleTimeString();
+
+      const row = document.createElement('div');
+      row.style.display = 'flex';
+      row.style.flexDirection = 'column';
+      row.style.gap = '4px';
+      row.style.padding = '6px 4px';
+      row.style.borderTop = '1px solid var(--border)';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.innerHTML = `<span style="font-weight:600;">${label}</span><span style="color:var(--muted);">${runId}</span>`;
+      row.appendChild(header);
+
+      const flow = document.createElement('div');
+      flow.style.display = 'flex';
+      flow.style.flexWrap = 'wrap';
+      flow.style.alignItems = 'center';
+      flow.style.gap = '4px';
+      nodes.forEach((n, idx) => {
+        const node = document.createElement('span');
+        node.textContent = n;
+        node.style.padding = '2px 8px';
+        node.style.borderRadius = '999px';
+        node.style.background = idx === 0 ? '#e0f2fe' : (idx === nodes.length - 1 ? '#ecfdf5' : '#eef2ff');
+        node.style.border = '1px solid #d4d4d8';
+        flow.appendChild(node);
+        if (idx < nodes.length - 1) {
+          const arrow = document.createElement('span');
+          arrow.textContent = '➜';
+          arrow.style.color = '#6b7280';
+          flow.appendChild(arrow);
+        }
+      });
+      row.appendChild(flow);
+
+      // Append without clearing previous runs
+      panel.appendChild(row);
+    }
+
     // CoO / Billing flows wired to embedded coo-demo service
     async function runCooFlow(kind) {
       const ep = (COO_API.endpoints || {})[kind];
@@ -946,6 +1035,7 @@
         });
         const data = await res.json().catch(() => ({}));
         writeResults(kind, data, !!window.__appendMode);
+        appendExecutionGraph(kind, payload, data);
         window.__appendMode = false;
         if (!res.ok) showToast(label + ' failed (HTTP ' + res.status + ')');
         else showToast(label + ' completed');
