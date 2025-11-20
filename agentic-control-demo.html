@@ -134,7 +134,7 @@
       <div class="chip active" data-env="Prod">Prod</div>
       <div class="chip" data-env="UAT">UAT</div>
       <div class="chip" data-env="Sandbox">Sandbox</div>
-      <div style="width:28px; height:28px; background:#ddd; border-radius:999px; margin-left:8px;"></div>
+      <div id="llmDot" style="width:12px; height:12px; background:#ddd; border-radius:999px; margin-left:8px; border:2px solid #d1d5db;"></div>
       <span id="llmStatus" style="margin-left:12px; font-size:12px; color:var(--muted);">LLM: loading…</span>
     </div>
   </header>
@@ -1259,7 +1259,31 @@
           const execT = Array.isArray(data?.executed?.tasks) ? data.executed.tasks : [];
           const execM = Array.isArray(data?.executed?.messages) ? data.executed.messages : [];
 
-          // Turn tasks into a detailed step-by-step narrative including practitioner and due time
+          // Turn tasks into a detailed step-by-step narrative including practitioner, due time, and best-guess policy alignment
+          const activePol = window.__agenticReferralPolicy;
+          const polLines = activePol && activePol.policies_markdown
+            ? activePol.policies_markdown.split('\n').map(l => l.trim()).filter(Boolean)
+            : [];
+          function bestPolicyFor(desc) {
+            if (!desc || !polLines.length) return '';
+            const d = desc.toLowerCase();
+            // Simple heuristics: look for overlapping keywords
+            let best = '';
+            let bestScore = 0;
+            polLines.forEach(line => {
+              const l = line.toLowerCase();
+              let score = 0;
+              ['suicide', 'risk', 'follow-up', 'follow up', 'gp', 'appointment', 'share', 'consent'].forEach(k => {
+                if (d.includes(k) && l.includes(k)) score += 1;
+              });
+              if (score > bestScore) {
+                bestScore = score;
+                best = line;
+              }
+            });
+            return bestScore > 0 ? best : '';
+          }
+
           const taskLines = execT.map(t => {
             const inp = t?.input || {};
             const owner = inp.owner_ref || 'Unknown practitioner';
@@ -1275,7 +1299,9 @@
               }
             } catch (e) {}
             const status = (t?.result?.status) ? ` [status: ${t.result.status}]` : '';
-            return `• ${desc} → ${owner}${when ? ' (due ' + when + ')' : ''}${status}`;
+            const polHint = bestPolicyFor(desc);
+            const hintHtml = polHint ? `<br/>&nbsp;&nbsp;<span style="color:#6b7280; font-size:12px;">(from policy: ${polHint})</span>` : '';
+            return `• ${desc} → ${owner}${when ? ' (due ' + when + ')' : ''}${status}${hintHtml}`;
           }).join('<br/>');
 
           // Messages become explicit sharing actions with purpose and a short content preview
@@ -1308,7 +1334,9 @@
                 .filter(Boolean);
               if (lines.length) {
                 const body = lines.map(l => `• ${l}`).join('<br/>');
-                policyHtml = `<p><strong>Applied policies (${pol.pack || 'Custom'}):</strong><br/>${body}</p>`;
+                const raw = pol.policies_markdown;
+                policyHtml = `<p><strong>Applied policies (${pol.pack || 'Custom'}):</strong><br/>${body}</p>` +
+                             (raw ? `<pre style="margin-top:4px; padding:6px; background:#f9fafb; border-radius:4px; white-space:pre-wrap;">${raw}</pre>` : '');
 
                 const totalTasks = execT.length;
                 const totalMsgs = execM.length;
@@ -1524,10 +1552,11 @@
       if (sel) sel.value = domain;
     }
 
-    // Env selector
+    // Env selector + LLM status
     const envChips = document.querySelectorAll('.env .chip');
     const envLabel = document.getElementById('envLabel');
     const llmStatusEl = document.getElementById('llmStatus');
+    const llmDotEl = document.getElementById('llmDot');
 
     async function updateLlmStatus() {
       if (!llmStatusEl) return;
@@ -1537,12 +1566,26 @@
         const info = await res.json();
         const provider = info.provider || 'mock';
         const model = info.model || '';
-        const label = provider === 'mock'
+        const isMock = provider === 'mock' || info.is_mock === true;
+        const label = isMock
           ? 'LLM: mock'
           : 'LLM: ' + provider + (model ? ' • ' + model : '');
         llmStatusEl.textContent = label;
+        if (llmDotEl) {
+          if (isMock) {
+            llmDotEl.style.background = '#e5e7eb';  // grey for mock
+            llmDotEl.style.borderColor = '#d1d5db';
+          } else {
+            llmDotEl.style.background = '#22c55e';  // green when real LLM reachable
+            llmDotEl.style.borderColor = '#16a34a';
+          }
+        }
       } catch (e) {
         llmStatusEl.textContent = 'LLM: unknown';
+        if (llmDotEl) {
+          llmDotEl.style.background = '#f97373';  // red-ish on error/unknown
+          llmDotEl.style.borderColor = '#b91c1c';
+        }
       }
     }
 
