@@ -1065,7 +1065,6 @@
       loadPatients();
       loadContextList();
       updateAgenticPolicyBanner();
-      updateLlmStatus();
       const evalCtx = document.getElementById('evalContext');
       if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
       if (evalCtx) evalCtx.addEventListener('change', () => applyEvalContext(evalCtx.value || 'discharge'));
@@ -1383,6 +1382,28 @@
     // Env selector
     const envChips = document.querySelectorAll('.env .chip');
     const envLabel = document.getElementById('envLabel');
+    const llmStatusEl = document.getElementById('llmStatus');
+
+    async function updateLlmStatus() {
+      if (!llmStatusEl) return;
+      try {
+        const res = await fetch((HEALTH_API.baseUrl || '') + '/llm-info');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const info = await res.json();
+        const provider = info.provider || 'mock';
+        const model = info.model || '';
+        const label = provider === 'mock'
+          ? 'LLM: mock'
+          : 'LLM: ' + provider + (model ? ' • ' + model : '');
+        llmStatusEl.textContent = label;
+      } catch (e) {
+        llmStatusEl.textContent = 'LLM: unknown';
+      }
+    }
+
+    // Call once on script load in case DOMContentLoaded has already fired
+    updateLlmStatus();
+
     envChips.forEach(ch => ch.addEventListener('click', () => {
       envChips.forEach(x => x.classList.remove('active'));
       ch.classList.add('active');
