@@ -9,6 +9,7 @@ from .ccs_tools import ccs_get_meter_reads
 from .agentis_demo import run_demo as agentis_run_demo
 from .agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
+from libs.agentis.llm_client import LLMClient
 from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client
 
 app = FastAPI(title="Ownership Trigger Agent")
@@ -30,6 +31,16 @@ class DischargeDemoResponse(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/llm-info")
+def llm_info():
+    client = LLMClient()
+    return {
+        "provider": client.provider,
+        "model": client.model,
+        "is_mock": client.provider == "mock",
+    }
 
 
 # Resolve project root (one level above 'services') so CSV/context paths are correct
