@@ -1238,8 +1238,22 @@
           const denied = Array.isArray(data?.share_result?.denied) ? data.share_result.denied : [];
           const allowLines = allowed.map(a => `• ${a.type}: ${a.to_ref || a.owner_ref || ''} (${a.purpose_of_use || a.description || ''})`).join('<br/>');
           const denyLines = denied.map(a => `• ${a.type}: ${a.to_ref || a.owner_ref || ''} – denied${a.reason? ' ('+a.reason+')':''}`).join('<br/>');
+
+          // Surface the active policy snippet that influenced this referral, if any
+          let policyHtml = '';
+          try {
+            const pol = window.__agenticReferralPolicy;
+            if (pol && pol.policies_markdown) {
+              const firstLine = (pol.policies_markdown.split('\n').find(l => l.trim()) || '').trim();
+              if (firstLine) {
+                policyHtml = `<p><strong>Applied policy (${pol.pack || 'Custom'}):</strong><br/>${firstLine}</p>`;
+              }
+            }
+          } catch {}
+
           return `<p><strong>Agentic referral executed.</strong></p>` +
                  risk +
+                 policyHtml +
                  (tasks ? `<p><strong>Tasks:</strong><br/>${tasks}</p>` : '') +
                  (msgs ? `<p><strong>Messages:</strong><br/>${msgs}</p>` : '') +
                  gpMsg +

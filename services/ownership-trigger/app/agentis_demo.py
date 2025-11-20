@@ -59,16 +59,25 @@ def run_referral_demo(patient_id: str, extra_context: Optional[Dict[str, Any]] =
         note_text = (cases[idx] or {}).get("text", "") if cases else ""
     except Exception:
         note_text = ""
-    # Derive a compact risk summary for inclusion in GP communications
-    try:
-        mod = (int(patient_id) - 1) % 3
-    except Exception:
-        mod = 0
-    risk_summary = (
-        "Risk: suicide risk flagged (passive ideation, no plan); safety plan completed." if mod == 0 else
-        "Risk: housing instability; recent missed medications; community MH follow-up needed." if mod == 1 else
-        "Risk: recent medication change (sertraline started); monitor adherence and side effects."
-    )
+    # Derive a compact risk summary for inclusion in GP communications.
+    # Align with Epic mock convention: any patient_id containing '5' represents
+    # active suicide risk with NO documented safety plan completed.
+    pid_str = str(patient_id)
+    if "5" in pid_str:
+        risk_summary = (
+            "Risk: suicide risk flagged (active ideation, no safety plan documented). "
+            "Do not treat safety planning as completed; ensure plan is created and reviewed before discharge."
+        )
+    else:
+        try:
+            mod = (int(patient_id) - 1) % 3
+        except Exception:
+            mod = 0
+        risk_summary = (
+            "Risk: suicide risk flagged (passive ideation, safety plan completed)." if mod == 0 else
+            "Risk: housing instability; recent missed medications; community MH follow-up needed." if mod == 1 else
+            "Risk: recent medication change (sertraline started); monitor adherence and side effects."
+        )
     pre = preprocess_for_prompt({
         "bundle": ctx.get("patient_bundle"),
         "consent": load_fixture(os.path.join(FIX_DIR, "consent_policy_snippets.json")),
