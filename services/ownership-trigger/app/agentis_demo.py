@@ -84,14 +84,21 @@ def run_referral_demo(patient_id: str, extra_context: Optional[Dict[str, Any]] =
         "handover": {"note": note_text, "risk_summary": risk_summary},
         "extra": (extra_context or {})
     })
-    # Prepare a focused referral instruction for the LLM
+    # Prepare a focused referral instruction for the LLM.
+    # The preprocessed context may include explicit procedural policies (for example
+    # under an "extra" or "policies_markdown" field). The model must treat those
+    # policies as authoritative instructions when deciding which tasks and
+    # notifications to create.
     system = (
         "You are a care orchestration planner. Output a JSON object with two arrays: \n"
         "tasks: [{owner_ref, description, due_ts, purpose_of_use}], \n"
         "messages: [{channel, to_ref, purpose_of_use, content}]. \n"
         "Use Australia/Sydney timezone. Keep minimal safe actions. \n"
         "If the context includes a ServiceRequest referral or follow-up need, you MUST include at least one task and one message. \n"
-        "Prefer due_ts within 7 days; keep descriptions concise and compliant."
+        "Prefer due_ts within 7 days; keep descriptions concise and compliant. \n"
+        "The context may also include a set of written policies or rules (for example in a 'policies_markdown' field). \n"
+        "You MUST read those policies and faithfully implement any clear procedural instructions as concrete tasks or messages. \n"
+        "If a policy explicitly requires scheduling certain appointments, follow-up calls, or notifications, you must create corresponding tasks/messages reflecting that requirement."
     )
     user = json.dumps({
         "goal": "Complete referral follow-up tasks and notifications",
