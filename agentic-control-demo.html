@@ -226,6 +226,39 @@
                 <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Open Link</button>
               </td>
             </tr>
+            <tr>
+              <td>Agentic Referral (LLM plan)</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">2</td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">4</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">View</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">Run</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">Open Link</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Consent Check</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">2</td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">7</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">View</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">Run</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">Open Link</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Travel (Uber Booking)</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">2</td>
+              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">3</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">View</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">Run</button>
+                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">Open Link</button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -287,6 +320,12 @@
   <section id="healthAgents" class="view">
     <h2 style="margin:8px 0;">Health Agents</h2>
     <p style="color:var(--muted); margin-top:-8px;">Run common Health agent flows. These call the local Ownership Trigger backend directly from the app.</p>
+    <div class="card" style="margin-bottom:12px;">
+      <h3 style="margin-top:0;">Active Agentic Referral Policy</h3>
+      <p style="color:var(--muted); margin-top:-4px; font-size:12px;">This shows the latest policies submitted from Prompt Studio that will influence the Agentic Referral (LLM plan).</p>
+      <p style="margin:4px 0;"><strong>Pack:</strong> <span id="ha_policy_pack">None submitted</span></p>
+      <p style="margin:0;"><strong>Last updated:</strong> <span id="ha_policy_time">–</span></p>
+    </div>
     <div class="grid">
       <div class="card" id="ha_card_discharge">
         <h3>Patient Discharge Trigger</h3>
@@ -594,7 +633,8 @@
                 </textarea>
                 <div class="footer-actions">
                   <button class="btn" onclick="showToast('Policies edited (mock)')">Edit</button>
-                  <button class="btn primary" onclick="showToast('Policy changes saved (mock)')">Save</button>
+                  <button class="btn" onclick="showToast('Policy changes saved (mock)')">Save Draft</button>
+                  <button class="btn primary" onclick="submitPoliciesForAgentic()">Submit to LLM for Agentic Referral</button>
                 </div>
               </div>
               <div class="tabpane">
@@ -643,34 +683,38 @@
       </div>
     </section>
 
-    <!-- Screen 5: Eval & Rollout -->
+    <!-- Screen 5: Eval & Rollout (Health Agents) -->
     <section id="eval" class="view">
       <h2 style="margin:8px 0;">Evaluation & Rollout</h2>
-      <p id="evalSubtext" style="color:var(--muted);">Balance Transfer Agent • New Prompt Version v1.8.0</p>
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <p id="evalSubtext" style="color:var(--muted); margin:0;">Health Agents  Patient Discharge  Proposed Prompt Version v1.0.0</p>
+        <div class="row" style="gap:8px;">
+          <label for="evalContext" style="font-size:12px; color:var(--muted);">Evaluation context</label>
+          <select id="evalContext" style="max-width:260px;">
+            <option value="discharge">Patient Discharge</option>
+            <option value="agentic">Agentic Referral (LLM plan)</option>
+            <option value="consent">Consent Check</option>
+            <option value="travel">Travel (Uber Booking)</option>
+          </select>
+        </div>
+      </div>
 
-      <div class="metrics">
+      <div id="evalMetrics" class="metrics">
         <div class="card">
-          <strong>Before (v1.7.3)</strong><br />
-          Disconnection false positives: 12.4%<br />
-          Escalation rate: 7%<br />
-          SLA breaches: 5
+          <strong>Before</strong><br />
+          Baseline metrics will load here.
         </div>
         <div class="card">
-          <strong>After (v1.8.0 – Test Run)</strong><br />
-          Disconnection false positives: 8.1%<br />
-          Escalation rate: 8%<br />
-          SLA breaches: 5
+          <strong>After (Test Run)</strong><br />
+          Updated metrics will load here.
         </div>
         <div class="card">
           <strong>Confidence</strong><br />
-          Eval coverage: 95%<br />
-          Critical regressions: 0<br />
-          Policy breaches: 0
+          Eval coverage and policy breach summary will load here.
         </div>
         <div class="card">
           <strong>Notes</strong><br />
-          Improved on 7 edge cases<br />
-          No general billing regressions
+          Scenario-specific notes will load here.
         </div>
       </div>
 
@@ -680,10 +724,8 @@
           <thead>
             <tr><th>Suite</th><th>Status</th><th>Passed / Total</th><th>Notes</th></tr>
           </thead>
-          <tbody>
-            <tr><td>CoO Disconnection Scenarios</td><td>✅</td><td>45 / 45</td><td>Improved on 7 edge cases</td></tr>
-            <tr><td>General Billing Scenarios</td><td>✅</td><td>120 / 120</td><td>No regressions</td></tr>
-            <tr><td>Vulnerable Customer Scenarios</td><td>✅</td><td>30 / 30</td><td>Coverage increased</td></tr>
+          <tbody id="evalSuitesBody">
+            <tr><td>Loading…</td><td></td><td></td><td></td></tr>
           </tbody>
         </table>
       </div>
@@ -1017,11 +1059,62 @@
     bindSelectSync('ha_patient_con_sel','ha_patient_con');
     bindSelectSync('ha_patient_travel_sel','ha_patient_travel');
 
-    // Load on initial page load and when opening Health Agents
-    document.addEventListener('DOMContentLoaded', () => { loadPatients(); loadContextList(); });
+    // Load on initial page load and when opening Health Agents / Eval views
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPatients();
+      loadContextList();
+      updateAgenticPolicyBanner();
+      const evalCtx = document.getElementById('evalContext');
+      if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
+      if (evalCtx) evalCtx.addEventListener('change', () => applyEvalContext(evalCtx.value || 'discharge'));
+    });
     buttons.forEach(b => b.addEventListener('click', () => {
       if (b.dataset.view === 'healthAgents' && !patientsLoaded) loadPatients();
+      if (b.dataset.view === 'healthAgents') updateAgenticPolicyBanner();
+      if (b.dataset.view === 'eval') {
+        const evalCtx = document.getElementById('evalContext');
+        if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
+      }
     }));
+
+    // Global policy blob for Agentic Referral, populated from Prompt Studio
+    window.__agenticReferralPolicy = window.__agenticReferralPolicy || null;
+
+    function updateAgenticPolicyBanner() {
+      const pol = window.__agenticReferralPolicy;
+      const packEl = document.getElementById('ha_policy_pack');
+      const timeEl = document.getElementById('ha_policy_time');
+      if (!packEl || !timeEl) return;
+      if (!pol) {
+        packEl.textContent = 'None submitted';
+        timeEl.textContent = '–';
+        return;
+      }
+      packEl.textContent = pol.pack || 'Custom policies';
+      try {
+        const d = pol.submitted_at ? new Date(pol.submitted_at) : null;
+        timeEl.textContent = d ? d.toLocaleString() : pol.submitted_at || '–';
+      } catch {
+        timeEl.textContent = pol.submitted_at || '–';
+      }
+    }
+
+    function submitPoliciesForAgentic() {
+      const txt = document.getElementById('policyText');
+      const titleEl = document.getElementById('packTitle');
+      const packName = titleEl ? titleEl.textContent : '';
+      if (!txt) {
+        showToast('No policy textarea found');
+        return;
+      }
+      window.__agenticReferralPolicy = {
+        pack: packName,
+        policies_markdown: txt.value || '',
+        submitted_at: new Date().toISOString(),
+      };
+      showToast('Policies submitted for Agentic Referral (will apply on next run)');
+      updateAgenticPolicyBanner();
+    }
 
     // Health Agents execution direct to backend
     async function runHealthAgent(kind, payload) {
@@ -1049,6 +1142,15 @@
             const selVal = sel(sid);
             if (selVal) payload.patient_id = selVal;
           }
+        }
+        // For Agentic Referral, attach any submitted policies into context for the backend/LLM
+        if (kind === 'agenticReferral') {
+          const pol = window.__agenticReferralPolicy;
+          const ctx = (payload && payload.context) || {};
+          if (pol) {
+            ctx.policies = pol;
+          }
+          payload.context = ctx;
         }
         const res = await fetch(url, {
           method: 'POST',
@@ -1453,14 +1555,160 @@
       const sub = document.getElementById('evalSubtext');
       if (!sub) return;
       if (source === 'pack') {
-        sub.textContent = 'Prompt Pack: SA Water – Vulnerable Customer Handling v1.1 • Proposed v1.8.0';
+        sub.textContent = 'Prompt Pack: ' + (window.__currentPackName || 'Health Agents') + '  Proposed v1.0.0';
       } else if (source === 'propose-pack') {
-        sub.textContent = 'Proposed Deployment • SA Water – Vulnerable Customer Handling v1.1';
-      } else if (source === 'propose') {
-        sub.textContent = 'Balance Transfer Agent • Proposed Prompt Version v1.8.0';
-      } else {
-        sub.textContent = 'Balance Transfer Agent • New Prompt Version v1.8.0';
+        sub.textContent = 'Proposed Deployment  ' + (window.__currentPackName || 'Health Agents');
       }
+    }
+
+    // Health Eval & Rollout context configuration
+    const EVAL_CONTEXT_META = {
+      discharge: {
+        label: 'Patient Discharge',
+        subtext: 'Health Agents  Patient Discharge  Proposed Prompt Version v1.0.0',
+        metricsHtml: `
+          <div class="card">
+            <strong>Before (v1.0.0)</strong><br />
+            Unsafe discharge decisions (suicide risk): 6.3%<br />
+            Missed follow-up appointments: 18%<br />
+            Readmission within 7 days: 11
+          </div>
+          <div class="card">
+            <strong>After (v1.1.0  Test Run)</strong><br />
+            Unsafe discharge decisions (suicide risk): 1.2%<br />
+            Missed follow-up appointments: 10%<br />
+            Readmission within 7 days: 6
+          </div>
+          <div class="card">
+            <strong>Confidence</strong><br />
+            Eval coverage: 92% of discharge scenarios<br />
+            Critical regressions: 0<br />
+            Policy breaches (suicide + no plan): 0
+          </div>
+          <div class="card">
+            <strong>Notes</strong><br />
+            Improved handling of high-risk patients with no safety plan.<br />
+            Added checks that handover includes community referrals and follow-up.
+          </div>
+        `,
+        suitesHtml: `
+          <tr><td>High-Risk Discharge Scenarios</td><td></td><td>24 / 24</td><td>No unsafe discharges when suicide risk present and no plan.</td></tr>
+          <tr><td>Standard Discharge Scenarios</td><td></td><td>60 / 60</td><td>Improved follow-up scheduling and documentation.</td></tr>
+          <tr><td>Readmission Prevention Scenarios</td><td></td><td>18 / 18</td><td>Better recognition of recent admissions.</td></tr>
+        `,
+      },
+      agentic: {
+        label: 'Agentic Referral (LLM plan)',
+        subtext: 'Health Agents  Agentic Referral (LLM plan)  Proposed Prompt Version v1.0.0',
+        metricsHtml: `
+          <div class="card">
+            <strong>Before (v1.0.0)</strong><br />
+            Correct risk triage: 81%<br />
+            Referrals missing key handover info: 22%<br />
+            Manual escalations from referral team: 14%
+          </div>
+          <div class="card">
+            <strong>After (v1.1.0  Test Run)</strong><br />
+            Correct risk triage: 93%<br />
+            Referrals missing key handover info: 6%<br />
+            Manual escalations from referral team: 9%
+          </div>
+          <div class="card">
+            <strong>Confidence</strong><br />
+            Eval coverage: 88% of referral scenarios<br />
+            Critical regressions: 0<br />
+            Policy breaches (privacy / consent): 0
+          </div>
+          <div class="card">
+            <strong>Notes</strong><br />
+            Agentic planner now incorporates submitted discharge/privacy policies.<br />
+            Better separation of GP vs community mental health referrals.
+          </div>
+        `,
+        suitesHtml: `
+          <tr><td>Risk-Aware Referral Scenarios</td><td></td><td>32 / 32</td><td>Correct channel chosen for high-risk patients.</td></tr>
+          <tr><td>Privacy-Constrained Referral Scenarios</td><td></td><td>20 / 20</td><td>No sharing beyond consented purposes.</td></tr>
+          <tr><td>Low-Risk Routine Referrals</td><td></td><td>28 / 28</td><td>Stable behaviour; no regressions.</td></tr>
+        `,
+      },
+      consent: {
+        label: 'Consent Check',
+        subtext: 'Health Agents  Consent Check  Proposed Prompt Version v1.0.0',
+        metricsHtml: `
+          <div class="card">
+            <strong>Before (v1.0.0)</strong><br />
+            Correct allow/deny decisions: 89%<br />
+            Over-sharing events detected: 6<br />
+            Under-sharing (blocked but allowed): 11
+          </div>
+          <div class="card">
+            <strong>After (v1.1.0  Test Run)</strong><br />
+            Correct allow/deny decisions: 97%<br />
+            Over-sharing events detected: 0<br />
+            Under-sharing (blocked but allowed): 5
+          </div>
+          <div class="card">
+            <strong>Confidence</strong><br />
+            Eval coverage: 90% of consent scenarios<br />
+            Critical regressions: 0<br />
+            Policy breaches (Australian health privacy): 0
+          </div>
+          <div class="card">
+            <strong>Notes</strong><br />
+            Updated prompts aligned with Australian Health Privacy Regulations pack.<br />
+            Better handling of emergency vs routine access requests.
+          </div>
+        `,
+        suitesHtml: `
+          <tr><td>Treatment vs Operations Scenarios</td><td></td><td>26 / 26</td><td>Correctly distinguishes treatment and operations purposes.</td></tr>
+          <tr><td>Third-Party Disclosure Scenarios</td><td></td><td>18 / 18</td><td>No inappropriate sharing with non-care entities.</td></tr>
+          <tr><td>Emergency Access Scenarios</td><td></td><td>12 / 12</td><td>Correct emergency overrides applied.</td></tr>
+        `,
+      },
+      travel: {
+        label: 'Travel (Uber Booking)',
+        subtext: 'Health Agents  Travel (Uber Booking)  Proposed Prompt Version v1.0.0',
+        metricsHtml: `
+          <div class="card">
+            <strong>Before (v1.0.0)</strong><br />
+            Correct pickup/dropoff selection: 88%<br />
+            Late or missed pickups: 9%<br />
+            Incorrect clinical priority tagging: 7%
+          </div>
+          <div class="card">
+            <strong>After (v1.1.0  Test Run)</strong><br />
+            Correct pickup/dropoff selection: 96%<br />
+            Late or missed pickups: 4%<br />
+            Incorrect clinical priority tagging: 2%
+          </div>
+          <div class="card">
+            <strong>Confidence</strong><br />
+            Eval coverage: 80% of discharge and appointment transport cases<br />
+            Critical regressions: 0<br />
+            Policy breaches (safety / escort requirements): 0
+          </div>
+          <div class="card">
+            <strong>Notes</strong><br />
+            Better alignment of transport booking with discharge and referral context.<br />
+            Adds checks for escort requirements for high-risk patients.
+          </div>
+        `,
+        suitesHtml: `
+          <tr><td>Discharge Transport Scenarios</td><td></td><td>22 / 22</td><td>Correct handling of pickup, dropoff, and escort requirements.</td></tr>
+          <tr><td>Outpatient Appointment Transport</td><td></td><td>30 / 30</td><td>On-time arrival and correct location selection.</td></tr>
+          <tr><td>Edge-Case Routing Scenarios</td><td></td><td>10 / 10</td><td>Graceful handling of unavailable services.</td></tr>
+        `,
+      },
+    };
+
+    function applyEvalContext(key) {
+      const meta = EVAL_CONTEXT_META[key] || EVAL_CONTEXT_META.discharge;
+      const sub = document.getElementById('evalSubtext');
+      const metrics = document.getElementById('evalMetrics');
+      const suitesBody = document.getElementById('evalSuitesBody');
+      if (sub) sub.textContent = meta.subtext;
+      if (metrics) metrics.innerHTML = meta.metricsHtml;
+      if (suitesBody) suitesBody.innerHTML = meta.suitesHtml;
     }
 
     // Deploy action

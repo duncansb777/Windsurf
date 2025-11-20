@@ -32,7 +32,8 @@ def health():
     return {"status": "ok"}
 
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# Resolve project root (one level above 'services') so CSV/context paths are correct
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 @app.get("/patients")
