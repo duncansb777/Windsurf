@@ -1229,12 +1229,42 @@
                  (provList ? `<p>Nearby providers: ${provList}…</p>` : '');
         }
         if (kind === 'agenticReferral' && data) {
-          const risk = data?.handover?.risk_summary ? `<p><strong>Risk:</strong> ${data.handover.risk_summary}</p>` : '';
+          const risk = data?.handover?.risk_summary ? `<p><strong>Risk summary for this patient:</strong> ${data.handover.risk_summary}</p>` : '';
           const execT = Array.isArray(data?.executed?.tasks) ? data.executed.tasks : [];
           const execM = Array.isArray(data?.executed?.messages) ? data.executed.messages : [];
-          const tasks = execT.map(t => `• ${t?.input?.description || 'Task'} → ${t?.input?.owner_ref || ''}`).join('<br/>');
-          const msgs = execM.map(m => `• ${m?.input?.channel || 'msg'} to ${m?.input?.to_ref || ''} (${m?.input?.purpose_of_use || ''})`).join('<br/>');
-          const gpMsg = data?.gp_message ? `<p><strong>GP message:</strong> ${data.gp_message}</p>` : '';
+
+          // Turn tasks into a detailed step-by-step narrative including practitioner and due time
+          const taskLines = execT.map(t => {
+            const inp = t?.input || {};
+            const owner = inp.owner_ref || 'Unknown practitioner';
+            const desc = inp.description || 'Task';
+            const due = inp.due_ts || '';
+            let when = '';
+            try {
+              if (due) {
+                const d = new Date(due);
+                if (!isNaN(d.getTime())) {
+                  when = d.toLocaleString('en-AU', { timeZone: 'Australia/Sydney' });
+                }
+              }
+            } catch (e) {}
+            const status = (t?.result?.status) ? ` [status: ${t.result.status}]` : '';
+            return `• ${desc} → ${owner}${when ? ' (due ' + when + ')' : ''}${status}`;
+          }).join('<br/>');
+
+          // Messages become explicit sharing actions with purpose and a short content preview
+          const msgLines = execM.map(m => {
+            const inp = m?.input || {};
+            const channel = inp.channel || 'message';
+            const to = inp.to_ref || 'Unknown recipient';
+            const pou = inp.purpose_of_use || '';
+            const status = (m?.result?.status) ? ` [status: ${m.result.status}]` : '';
+            let content = inp.content || '';
+            if (content.length > 140) content = content.slice(0, 140) + '…';
+            return `• ${channel} to ${to}${pou ? ' (' + pou + ')' : ''}${status}<br/>&nbsp;&nbsp;“${content || 'no content'}”`;
+          }).join('<br/>');
+
+          const gpMsg = data?.gp_message ? `<p><strong>Practitioner communication content:</strong> ${data.gp_message}</p>` : '';
           const allowed = Array.isArray(data?.share_result?.allowed) ? data.share_result.allowed : [];
           const denied = Array.isArray(data?.share_result?.denied) ? data.share_result.denied : [];
           const allowLines = allowed.map(a => `• ${a.type}: ${a.to_ref || a.owner_ref || ''} (${a.purpose_of_use || a.description || ''})`).join('<br/>');
@@ -1242,6 +1272,7 @@
 
           // Surface the active policy snippet that influenced this referral, if any
           let policyHtml = '';
+          let policyExplainHtml = '';
           try {
             const pol = window.__agenticReferralPolicy;
             if (pol && pol.policies_markdown) {
@@ -1252,6 +1283,18 @@
               if (lines.length) {
                 const body = lines.map(l => `• ${l}`).join('<br/>');
                 policyHtml = `<p><strong>Applied policies (${pol.pack || 'Custom'}):</strong><br/>${body}</p>`;
+
+                const totalTasks = execT.length;
+                const totalMsgs = execM.length;
+                const allowedCount = allowed.length;
+                const deniedCount = denied.length;
+                policyExplainHtml =
+                  `<p><strong>How policies affected this patient:</strong><br/>` +
+                  `For this patient, the planner created ${totalTasks} task(s) and ${totalMsgs} message(s). ` +
+                  (allowedCount || deniedCount
+                    ? `Policies allowed ${allowedCount} action(s) and blocked ${deniedCount} action(s) based on purpose of use and recipient.`
+                    : `All actions were evaluated against the submitted policies; none were explicitly blocked.`) +
+                  `</p>`;
               }
             }
           } catch {}
@@ -1259,8 +1302,9 @@
           return `<p><strong>Agentic referral executed.</strong></p>` +
                  risk +
                  policyHtml +
-                 (tasks ? `<p><strong>Tasks:</strong><br/>${tasks}</p>` : '') +
-                 (msgs ? `<p><strong>Messages:</strong><br/>${msgs}</p>` : '') +
+                 policyExplainHtml +
+                 (taskLines ? `<p><strong>Planned and executed tasks:</strong><br/>${taskLines}</p>` : '') +
+                 (msgLines ? `<p><strong>Notifications and information sharing:</strong><br/>${msgLines}</p>` : '') +
                  gpMsg +
                  (allowLines ? `<p><strong>Sharing allowed:</strong><br/>${allowLines}</p>` : '') +
                  (denyLines ? `<p><strong>Sharing denied:</strong><br/>${denyLines}</p>` : '');
