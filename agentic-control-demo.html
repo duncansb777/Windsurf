@@ -530,6 +530,8 @@
               <li><button class="btn" data-pack="SA Water – CoO Core v1.3">SA Water – CoO Core v1.3</button></li>
               <li><button class="btn" data-pack="SA Water – Vulnerable Customer Handling v1.1">SA Water – Vulnerable Customer Handling v1.1</button></li>
               <li><button class="btn" data-pack="GWW – Grange Billing Twin v0.9">GWW – Grange Billing Twin v0.9</button></li>
+              <li><button class="btn" data-pack="Australian Health Privacy Regulations">Australian Health Privacy Regulations</button></li>
+              <li><button class="btn" data-pack="Patient Discharge Process">Patient Discharge Process</button></li>
             </ul>
           </div>
         </aside>
@@ -574,11 +576,17 @@
               </div>
               <div class="tabpane">
                 <h4>Policies</h4>
-                <ul>
-                  <li>Never disconnect vulnerable customers without human approval.</li>
-                  <li>Always respect active payment plans.</li>
-                  <li>Log and justify any service interruption intent.</li>
-                </ul>
+                <textarea id="policyText" style="width:100%; min-height:180px; font-family:inherit;">
+- Never disconnect vulnerable customers without human approval.
+- Always respect active payment plans.
+- Log and justify any service interruption intent.
+- Apply Australian health privacy regulations (APP 6/11, state Health Records Acts) to all use of clinical and billing data.
+- Limit use and disclosure of patient-identifiable data to the minimum necessary for the specific care, payment, or operations purpose.
+- Do not use patient data from this environment for model training or analytics without explicit consent and governance approval.
+- For Patient Discharge agents: confirm that any suicidal ideation or high-risk flags are acknowledged and escalated before discharge is considered complete.
+- For Patient Discharge agents: ensure that a follow-up plan (appointments, community referrals, safety planning) is scheduled where clinically indicated.
+- For Patient Discharge agents: never auto-complete discharge workflows when suicide risk is present and no safety plan is documented.
+                </textarea>
                 <div class="footer-actions">
                   <button class="btn" onclick="showToast('Policies edited (mock)')">Edit</button>
                   <button class="btn primary" onclick="showToast('Policy changes saved (mock)')">Save</button>

@@ -21,6 +21,24 @@ patients: Dict[str, Dict[str, Any]] = {
     }
 }
 
+# Expand fixture set to include a panel of 20 mock patients with varied issues.
+# For IDs containing '5' we will mark suicide risk in the bundle without a safety plan.
+for pid in range(101, 121):
+    sid = str(pid)
+    if sid in patients:
+        continue
+    patients[sid] = {
+        "resourceType": "Patient",
+        "id": sid,
+        "identifier": [
+            {"system": "urn:mrn", "value": f"MRN-{sid}-MOCK"},
+        ],
+        "name": [{"text": f"Mock Patient {sid}", "given": ["Mock"], "family": sid}],
+        "gender": "unknown",
+        "birthDate": "1980-01-01",
+        "address": [{"line": ["1 Example St"], "city": "Sydney", "state": "NSW", "postalCode": "2000"}],
+    }
+
 organizations: Dict[str, Dict[str, Any]] = {
     "org-001": {
         "resourceType": "Organization",
@@ -370,7 +388,9 @@ def fhir_bundle_for_patient(patient_id: str) -> Dict[str, Any]:
     for d in document_references.values():
         if d.get("subject", {}).get("reference") == f"Patient/{patient_id}":
             entries.append({"resource": d})
-    # Synthesize a discharge DocumentReference and risk Observations per patient mod 3
+    # Synthesize a discharge DocumentReference and risk Observations.
+    # Special case: any patient id containing '5' is flagged with suicide risk and
+    # explicitly notes no safety plan in place.
     try:
         mod = (int(patient_id) - 1) % 3
     except Exception:
@@ -394,7 +414,22 @@ def fhir_bundle_for_patient(patient_id: str) -> Dict[str, Any]:
             }
         ],
     }
-    if mod == 0:
+    if "5" in str(patient_id):
+        # High suicide risk, no safety plan documented
+        doc_text = (
+            "Discharge Summary: Active suicidal ideation noted. No safety plan documented; urgent mental health follow-up required."
+        )
+        risk_obs = {
+            "resourceType": "Observation",
+            "id": f"risk-suicide-{patient_id}",
+            "status": "final",
+            "category": [{"text": "risk"}],
+            "code": {"text": "Suicide risk"},
+            "subject": {"reference": f"Patient/{patient_id}"},
+            "effectiveDateTime": TS,
+            "valueString": "active suicidal ideation; no safety plan in place",
+        }
+    elif mod == 0:
         doc_text = (
             "Discharge Summary: Major depressive disorder exacerbation. Passive suicidal ideation without plan; safety plan completed."
         )
