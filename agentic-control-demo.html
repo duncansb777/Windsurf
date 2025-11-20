@@ -525,13 +525,18 @@
       <div class="split">
         <aside>
           <div class="card">
+            <label for="studioDomain" style="font-size:12px; color:var(--muted);">Domain</label>
+            <select id="studioDomain" style="width:100%; margin-bottom:8px;">
+              <option value="water">Water Utility Agents</option>
+              <option value="health">Health Agents</option>
+            </select>
             <h4>Prompt Packs</h4>
             <ul id="packList" style="list-style:none; padding:0; margin:0; display:grid; gap:6px;">
-              <li><button class="btn" data-pack="SA Water – CoO Core v1.3">SA Water – CoO Core v1.3</button></li>
-              <li><button class="btn" data-pack="SA Water – Vulnerable Customer Handling v1.1">SA Water – Vulnerable Customer Handling v1.1</button></li>
-              <li><button class="btn" data-pack="GWW – Grange Billing Twin v0.9">GWW – Grange Billing Twin v0.9</button></li>
-              <li><button class="btn" data-pack="Australian Health Privacy Regulations">Australian Health Privacy Regulations</button></li>
-              <li><button class="btn" data-pack="Patient Discharge Process">Patient Discharge Process</button></li>
+              <li><button class="btn" data-pack="SA Water – CoO Core v1.3" data-domain="water">SA Water – CoO Core v1.3</button></li>
+              <li><button class="btn" data-pack="SA Water – Vulnerable Customer Handling v1.1" data-domain="water">SA Water – Vulnerable Customer Handling v1.1</button></li>
+              <li><button class="btn" data-pack="GWW – Grange Billing Twin v0.9" data-domain="water">GWW – Grange Billing Twin v0.9</button></li>
+              <li><button class="btn" data-pack="Australian Health Privacy Regulations" data-domain="health">Australian Health Privacy Regulations</button></li>
+              <li><button class="btn" data-pack="Patient Discharge Process" data-domain="health">Patient Discharge Process</button></li>
             </ul>
           </div>
         </aside>
@@ -539,7 +544,7 @@
           <div class="card">
             <h3 id="packTitle">SA Water – Vulnerable Customer Handling v1.1</h3>
             <p id="packDesc" style="color:var(--muted);">Guidance to protect vulnerable customers during billing and change-of-ownership flows.</p>
-            <p style="margin-top:-6px;"><strong>Affects:</strong> Balance Transfer Agent • Ownership Trigger Agent • Special Read Scheduler Agent</p>
+            <p style="margin-top:-6px;"><strong>Affects:</strong> <span id="packAffects">Balance Transfer Agent • Ownership Trigger Agent • Special Read Scheduler Agent</span></p>
 
             <div class="tabs" data-tabs="studio-tabs">
               <div class="tab active">Instructions</div>
@@ -603,6 +608,7 @@
                   <div>
                     <div class="card">
                       <h4 id="ctxTitle">Preview</h4>
+                      <p id="ctxPackHint" style="color:var(--muted); font-size:12px; margin-top:-4px; margin-bottom:4px;"></p>
                       <div id="ctxPreview" style="white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; max-height:40vh; overflow:auto;"></div>
                     </div>
                     <div class="card" style="margin-top:12px;">
@@ -1316,19 +1322,127 @@
     const packList = document.getElementById('packList');
     const packTitle = document.getElementById('packTitle');
     const packDesc = document.getElementById('packDesc');
+    const packAffects = document.getElementById('packAffects');
+    const policyText = document.getElementById('policyText');
+    const packInstructions = document.getElementById('packInstructions');
+    const studioDomain = document.getElementById('studioDomain');
+    const ctxPackHint = document.getElementById('ctxPackHint');
+
+    const PACK_META = {
+      'SA Water  CoO Core v1.3': {
+        domain: 'water',
+        desc: 'Core prompts for Change of Ownership across SA Water.',
+        affects: 'Change-of-Ownership Agent d Billing Agent d Special Read Scheduler Agent',
+        instructions: 'Core behaviour for SA Water Change of Ownership flows. Ensure address standardisation, correct ownership mapping, and safe handling of vulnerable customers.',
+        policies: [
+          'Never disconnect vulnerable customers without human approval.',
+          'Always respect active payment plans.',
+          'Log and justify any service interruption intent.',
+        ].join('\n- '),
+        contextHint: 'Use CoO specs, integrations, and vulnerable customer handling constraints for this pack.',
+        contextPrefixes: ['specs/water', 'architecture/water', 'integrations/water', 'constraints/water'],
+      },
+      'SA Water  Vulnerable Customer Handling v1.1': {
+        domain: 'water',
+        desc: 'Guidance to protect vulnerable customers during billing and change-of-ownership flows.',
+        affects: 'Balance Transfer Agent d Ownership Trigger Agent d Special Read Scheduler Agent',
+        instructions: 'When a customer is flagged as vulnerable, prioritise continuity of service, hardship options, and human review over automated disconnection.',
+        policies: [
+          'Never disconnect vulnerable customers without human approval.',
+          'Always respect active payment plans.',
+          'Log and justify any service interruption intent.',
+        ].join('\n- '),
+        contextHint: 'Use vulnerable customer handling specs and billing constraints to evaluate this pack.',
+        contextPrefixes: ['specs/water', 'constraints/water'],
+      },
+      'GWW  Grange Billing Twin v0.9': {
+        domain: 'water',
+        desc: 'Twin prompts for Grange Billing test environment.',
+        affects: 'Billing Twin Agent d Statement Generation Agent',
+        instructions: 'Keep the billing twin aligned with the Grange test environment; highlight any divergence between expected and observed bill calculations.',
+        policies: [
+          'Always reconcile bills against the source-of-truth billing system.',
+          'Flag and escalate any discrepancies in vulnerable customer accounts.',
+        ].join('\n- '),
+        contextHint: 'Use Grange billing specs and integration notes as context for this pack.',
+        contextPrefixes: ['specs/grange', 'integrations/grange'],
+      },
+      'Australian Health Privacy Regulations': {
+        domain: 'health',
+        desc: 'Prompts for applying Australian health privacy regulations (APPs, state Health Records Acts) to agent decisions.',
+        affects: 'Consent Check Agent d Health Data Sharing Agents',
+        instructions: 'Ensure all agent decisions about viewing or sharing clinical data comply with Australian Privacy Principles and state health records law. Only use data for justified care, payment, or operations purposes.',
+        policies: [
+          'Apply Australian health privacy regulations (APP 6/11, state Health Records Acts) to all use of clinical and billing data.',
+          'Limit use and disclosure of patient-identifiable data to the minimum necessary for the specific care, payment, or operations purpose.',
+          'Do not use patient data from this environment for model training or analytics without explicit consent and governance approval.',
+        ].join('\n- '),
+        contextHint: 'Use privacy regulations, consent models, and integration constraints as context for this pack.',
+        contextPrefixes: ['specs/health/privacy', 'constraints/health/privacy'],
+      },
+      'Patient Discharge Process': {
+        domain: 'health',
+        desc: 'Prompts for safe, policy-aligned patient discharge planning and follow-up.',
+        affects: 'Discharge Agent d Agentic Referral Agent d Transport Booking Agent',
+        instructions: 'At discharge, ensure suicide risk and other high-risk flags are reviewed; never complete discharge when risk is high and no safety plan exists. Schedule appropriate follow-up, community referrals, and transport as required.',
+        policies: [
+          'For Patient Discharge agents: confirm that any suicidal ideation or high-risk flags are acknowledged and escalated before discharge is considered complete.',
+          'For Patient Discharge agents: ensure that a follow-up plan (appointments, community referrals, safety planning) is scheduled where clinically indicated.',
+          'For Patient Discharge agents: never auto-complete discharge workflows when suicide risk is present and no safety plan is documented.',
+        ].join('\n- '),
+        contextHint: 'Use discharge process specs, risk assessment guidelines, and handover templates as context for this pack.',
+        contextPrefixes: ['specs/health/discharge', 'integrations/health', 'constraints/health'],
+      },
+    };
+
+    function applyDomainFilter(domain) {
+      if (!packList) return;
+      const buttons = packList.querySelectorAll('button[data-pack]');
+      buttons.forEach(btn => {
+        const d = btn.getAttribute('data-domain') || 'water';
+        btn.parentElement.style.display = (d === domain) ? '' : 'none';
+      });
+    }
+
+    window.__currentPackName = window.__currentPackName || null;
+
+    function selectPack(name) {
+      const meta = PACK_META[name];
+      if (!meta) return;
+      window.__currentPackName = name;
+      if (packTitle) packTitle.textContent = name;
+      if (packDesc) packDesc.textContent = meta.desc;
+      if (packAffects) packAffects.textContent = meta.affects;
+      if (packInstructions) packInstructions.value = meta.instructions;
+      if (policyText) policyText.value = '- ' + meta.policies;
+      if (ctxPackHint) ctxPackHint.textContent = meta.contextHint || '';
+      showToast('Selected: ' + name);
+      // Re-render context list according to the selected pack, if already loaded
+      renderContextList();
+    }
+
     if (packList) {
       packList.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-pack]');
         if (!btn) return;
         const name = btn.getAttribute('data-pack');
-        packTitle.textContent = name;
-        packDesc.textContent = name.includes('Vulnerable')
-          ? 'Guidance to protect vulnerable customers during billing and change-of-ownership flows.'
-          : name.includes('CoO Core')
-            ? 'Core prompts for Change of Ownership across SA Water.'
-            : 'Twin prompts for Grange Billing test environment.';
-        showToast('Selected: ' + name);
+        selectPack(name);
       });
+    }
+
+    if (studioDomain) {
+      studioDomain.addEventListener('change', () => {
+        const domain = studioDomain.value || 'water';
+        applyDomainFilter(domain);
+        // Pick a default pack for this domain
+        const firstBtn = packList && packList.querySelector(`button[data-domain="${domain}"]`);
+        if (firstBtn) selectPack(firstBtn.getAttribute('data-pack'));
+      });
+      // Initial domain + pack
+      const initialDomain = studioDomain.value || 'water';
+      applyDomainFilter(initialDomain);
+      const firstBtn = packList && packList.querySelector(`button[data-domain="${initialDomain}"]`);
+      if (firstBtn) selectPack(firstBtn.getAttribute('data-pack'));
     }
 
     // Add Example modal
@@ -1363,30 +1477,49 @@
       try {
         const res = await fetch((HEALTH_API.baseUrl||'') + '/context/list');
         const data = await res.json();
-        const listEl = document.getElementById('ctxList');
-        if (!listEl) return;
-        listEl.innerHTML = '';
         const items = (data && data.items) || [];
         window.__ctxItems = items;
-        if (!items.length) { listEl.textContent = 'No context files found'; return; }
-        items.sort((a,b)=> a.path.localeCompare(b.path));
-        items.forEach(it => {
-          const btn = document.createElement('button');
-          btn.className = 'btn';
-          btn.style.display = 'block';
-          btn.style.width = '100%';
-          btn.style.textAlign = 'left';
-          btn.style.marginBottom = '6px';
-          btn.textContent = it.path;
-          btn.addEventListener('click', ()=> previewContext(it.path));
-          listEl.appendChild(btn);
-        });
-        // Auto-preview first item
-        if (items[0]) previewContext(items[0].path);
-        updateCtxExistingFileOptions();
+        renderContextList();
       } catch(e) {
         showToast('Failed to load context list');
       }
+    }
+
+    function renderContextList() {
+      const listEl = document.getElementById('ctxList');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      const allItems = window.__ctxItems || [];
+      if (!allItems.length) { listEl.textContent = 'No context files found'; return; }
+
+      const name = window.__currentPackName;
+      const meta = name ? PACK_META[name] : null;
+      const prefixes = (meta && meta.contextPrefixes) || null;
+
+      let items = allItems.slice();
+      items.sort((a,b)=> a.path.localeCompare(b.path));
+      if (prefixes && prefixes.length) {
+        items = items.filter(it => prefixes.some(pref => it.path.startsWith(pref)));
+        if (!items.length) {
+          // Fall back to all items if no matches for this pack
+          items = allItems.slice().sort((a,b)=> a.path.localeCompare(b.path));
+        }
+      }
+
+      items.forEach(it => {
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.style.display = 'block';
+        btn.style.width = '100%';
+        btn.style.textAlign = 'left';
+        btn.style.marginBottom = '6px';
+        btn.textContent = it.path;
+        btn.addEventListener('click', ()=> previewContext(it.path));
+        listEl.appendChild(btn);
+      });
+      // Auto-preview first item for this filtered view
+      if (items[0]) previewContext(items[0].path);
+      updateCtxExistingFileOptions();
     }
 
     function highlightSACSF(text) {
