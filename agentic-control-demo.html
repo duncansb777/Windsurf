@@ -1244,9 +1244,13 @@
           try {
             const pol = window.__agenticReferralPolicy;
             if (pol && pol.policies_markdown) {
-              const firstLine = (pol.policies_markdown.split('\n').find(l => l.trim()) || '').trim();
-              if (firstLine) {
-                policyHtml = `<p><strong>Applied policy (${pol.pack || 'Custom'}):</strong><br/>${firstLine}</p>`;
+              const lines = pol.policies_markdown
+                .split('\n')
+                .map(l => l.trim())
+                .filter(Boolean);
+              if (lines.length) {
+                const body = lines.map(l => `• ${l}`).join('<br/>');
+                policyHtml = `<p><strong>Applied policies (${pol.pack || 'Custom'}):</strong><br/>${body}</p>`;
               }
             }
           } catch {}
@@ -1261,14 +1265,38 @@
                  (denyLines ? `<p><strong>Sharing denied:</strong><br/>${denyLines}</p>` : '');
         }
         if (kind === 'consent' && data) {
-          const decisionVal = (typeof data?.decision === 'object') ? JSON.stringify(data.decision) : (data?.decision || 'unknown');
-          const allowed = data?.allowed || [];
-          const denied = data?.denied || [];
+          const decision = data?.decision;
+          const allowed = Array.isArray(data?.allowed) ? data.allowed : [];
+          const denied = Array.isArray(data?.denied) ? data.denied : [];
           const why = data?.reason || data?.restrictions || '';
-          let html = `<p><strong>Consent decision:</strong> ${decisionVal}</p>`;
-          if (Array.isArray(allowed) && allowed.length) html += `<p><strong>Allowed:</strong> ${allowed.join(', ')}</p>`;
-          if (Array.isArray(denied) && denied.length) html += `<p><strong>Not allowed:</strong> ${denied.join(', ')}</p>`;
-          if (why) html += `<p><strong>Why:</strong> ${typeof why==='string'? why : JSON.stringify(why)}</p>`;
+
+          let headline = 'unknown';
+          let policyRefs = [];
+          if (typeof decision === 'object' && decision) {
+            const allowedFlag = decision.allowed;
+            if (allowedFlag === true) headline = 'sharing allowed';
+            else if (allowedFlag === false) headline = 'sharing not allowed';
+            else headline = JSON.stringify(decision);
+            if (Array.isArray(decision.policy_refs)) policyRefs = decision.policy_refs;
+          } else if (typeof decision === 'string') {
+            headline = decision;
+          }
+
+          let html = `<p><strong>Consent decision:</strong> ${headline}</p>`;
+          if (policyRefs.length) {
+            html += `<p><strong>Applied policies:</strong> ${policyRefs.join(', ')}</p>`;
+          }
+          if (allowed.length) {
+            html += `<p><strong>Sharing allowed for:</strong><br/>` +
+                    allowed.map(a => `• ${a}`).join('<br/>') + '</p>';
+          }
+          if (denied.length) {
+            html += `<p><strong>Not allowed for:</strong><br/>` +
+                    denied.map(a => `• ${a}`).join('<br/>') + '</p>';
+          }
+          if (why) {
+            html += `<p><strong>Why:</strong> ${typeof why==='string'? why : JSON.stringify(why)}</p>`;
+          }
           return html;
         }
         if (kind === 'uber' && data) {
