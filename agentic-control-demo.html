@@ -1555,10 +1555,10 @@
     // Env selector + LLM status
     const envChips = document.querySelectorAll('.env .chip');
     const envLabel = document.getElementById('envLabel');
-    const llmStatusEl = document.getElementById('llmStatus');
-    const llmDotEl = document.getElementById('llmDot');
 
     async function updateLlmStatus() {
+      const llmStatusEl = document.getElementById('llmStatus');
+      const llmDotEl = document.getElementById('llmDot');
       if (!llmStatusEl) return;
       try {
         const res = await fetch((HEALTH_API.baseUrl || '') + '/llm-info');
