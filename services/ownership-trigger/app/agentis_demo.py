@@ -61,9 +61,12 @@ def run_referral_demo(patient_id: str, extra_context: Optional[Dict[str, Any]] =
         note_text = ""
     # Derive a compact risk summary for inclusion in GP communications.
     # Align with Epic mock convention: any patient_id containing '5' represents
-    # active suicide risk with NO documented safety plan completed.
+    # active suicide risk with NO documented safety plan completed. Expose this
+    # both as free-text summary and as a structured flag that the LLM can rely
+    # on when deciding whether suicide-specific policies apply.
     pid_str = str(patient_id)
-    if "5" in pid_str:
+    has_suicide_risk = "5" in pid_str
+    if has_suicide_risk:
         risk_summary = (
             "Risk: suicide risk flagged (active ideation, no safety plan documented). "
             "Do not treat safety planning as completed; ensure plan is created and reviewed before discharge."
@@ -81,14 +84,17 @@ def run_referral_demo(patient_id: str, extra_context: Optional[Dict[str, Any]] =
     pre = preprocess_for_prompt({
         "bundle": ctx.get("patient_bundle"),
         "consent": load_fixture(os.path.join(FIX_DIR, "consent_policy_snippets.json")),
-        "handover": {"note": note_text, "risk_summary": risk_summary},
+        "handover": {"note": note_text, "risk_summary": risk_summary, "has_suicide_risk": has_suicide_risk},
         "extra": (extra_context or {})
     })
     # Prepare a focused referral instruction for the LLM.
     # The preprocessed context may include explicit procedural policies (for example
     # under an "extra" or "policies_markdown" field). The model must treat those
     # policies as authoritative instructions when deciding which tasks and
-    # notifications to create.
+    # notifications to create. The context also exposes a structured flag
+    # context.handover.has_suicide_risk (true/false) that the model MUST use
+    # when deciding whether suicide-specific policies (such as "two GP follow-up
+    # appointments at 14 and 28 days") apply.
     system = (
         "You are a care orchestration planner. Output a JSON object with two arrays: \n"
         "tasks: [{owner_ref, description, due_ts, purpose_of_use}], \n"
@@ -98,7 +104,9 @@ def run_referral_demo(patient_id: str, extra_context: Optional[Dict[str, Any]] =
         "Prefer due_ts within 7 days; keep descriptions concise and compliant. \n"
         "The context may also include a set of written policies or rules (for example in a 'policies_markdown' field). \n"
         "You MUST read those policies and faithfully implement any clear procedural instructions as concrete tasks or messages. \n"
-        "If a policy explicitly requires scheduling certain appointments, follow-up calls, or notifications, you must create corresponding tasks/messages reflecting that requirement."
+        "If a policy explicitly requires scheduling certain appointments, follow-up calls, or notifications, you must create corresponding tasks/messages reflecting that requirement. \n"
+        "Only apply suicide-specific policies that mention scheduling multiple GP follow-up appointments when context.handover.has_suicide_risk is true. \n"
+        "When context.handover.has_suicide_risk is false, you MUST NOT schedule those suicide-specific multi-appointment follow-ups, even if such a policy is present."
     )
     user = json.dumps({
         "goal": "Complete referral follow-up tasks and notifications",
