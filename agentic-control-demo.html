@@ -273,6 +273,18 @@
         <div id="coo_result_text" style="padding:12px; line-height:1.5; color:#1f2937;"></div>
       </div>
     </div>
+
+    <div class="grid" style="margin-top:12px;">
+      <div class="card">
+        <h3>GenAI Hub</h3>
+        <p style="color:var(--muted); margin-top:-4px;">Open the external DXC GenAI Hub experience inside the Billing view.</p>
+        <button class="btn" onclick="loadGenAIHub()">Load GenAI Hub</button>
+      </div>
+      <div class="card" style="grid-column: span 2;">
+        <h3>GenAI Hub View</h3>
+        <iframe id="genai_hub_iframe" title="DXC GenAI Hub" style="width:100%; height:480px; border:1px solid var(--border); border-radius:8px; background:white;" src="about:blank"></iframe>
+      </div>
+    </div>
   </section>
 
   <!-- Health Agents (actions) -->
@@ -1445,6 +1457,13 @@
       }
       showToast('Context files uploaded');
       loadContextList();
+    }
+
+    function loadGenAIHub() {
+      const iframe = document.getElementById('genai_hub_iframe');
+      if (!iframe) return;
+      iframe.src = 'https://dxc-genai-hub-app.politedesert-4176ca70.australiaeast.azurecontainerapps.io/?code=1.AQ0AcTXzkw9Vz0Own80zEzjQhvvo71E4061Oj9msH9M92JwNAGINAA.AgABBAIAAABlMNzVhAPUTrARzfQjWPtKAwDs_wUA9P9CISUpc3ksY-bqMEKJj32sGdqtDK1oTdnyVy3gjKmWz8P_9JPZj-HR9q509PGFfSOpKwL2zrJcRe-TjaT0S7g77DmCpbhoxIMQ72995aAXkj02D4-FCWDSwhwqFwS_V17e86rplMIrR4RpUiDO12ehHecIQylna1FQ5zL2Xl8N1ZkgwfvLr8DHaOQybehtcgAuAc_emrat6vDD2dTNCvz4xDzqb9yTUQFhIYA7hxLEMTjmgdtpXTqxV6DC7B2kUyxegdVc2ewEOzemoQD8QCNJmzdV2k2E6ixhzX1GovQKTfWw65an8hj0em4d-SNfbIJFSCwzivRVT9Vcrogxblium5QEXhNY0CpPtQNDGXDC-fKJGqaq45WkqHVzgHj5M7z5B0U2FLCoLXkT5RJ7JFlpA1Aq-MF4Hh_rPDDGbmbf3B1aNEBUAQu70N1Z7dWwrmxkKcJP5etST8YTB0dkJOwlFGyk8FY8l35Ykf47HaAf3YQVnkUY_uCuoZmdACwGqJP4MLoK9NhEkOpRpYfEvYUnUnDHT_ekFf7dOXXUJdg8pfzvhAnf6bYULN0y49mKBuxvGolMZUmTv2JXySqCLMWjLgc_GK272FQ_Y53CGnJEO0y2YTuiANVL1UQe4oq5VyS9FoEFMuXqRZBbeIX7eiH-SpgQWSLDR8LzhMc2O88j2hdtPXfzQr6ivQskbuWWokwyq9QnrQY5TO3NKfNpcX2EpZ4tdPcD8H6AJkIof1iU1tyglT7_xY8ucV0w3mjGqS3ELEztnWGGPleb34UXBnQvry9e6OINZfDd7l5R1-xhsHmnQ5o4zFbREdKRU7fMqnQ_btBjwB1bMtUwO593O7PIr-jvkbeiFhuapvatKl4ygRMAlqaOxkWN_QmAkzFzPY1&session_state=00aaede9-d758-7e93-f0a0-e6eb241acb18';
+      showToast('Loading GenAI Hub…');
     }
 
     function updateCtxExistingFileOptions() {
