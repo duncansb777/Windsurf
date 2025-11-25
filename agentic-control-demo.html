@@ -320,83 +320,9 @@
   <!-- Health Agents (actions) -->
   <section id="healthAgents" class="view">
     <h2 style="margin:8px 0;">Health Agents</h2>
-    <p style="color:var(--muted); margin-top:-8px;">Run common Health agent flows. These call the local Ownership Trigger backend directly from the app.</p>
-    <div class="card" style="margin-bottom:12px;">
-      <h3 style="margin-top:0;">Active Agentic Referral Policy</h3>
-      <p style="color:var(--muted); margin-top:-4px; font-size:12px;">This shows the latest policies submitted from Prompt Studio that will influence the Agentic Referral (LLM plan).</p>
-      <p style="margin:4px 0;"><strong>Pack:</strong> <span id="ha_policy_pack">None submitted</span></p>
-      <p style="margin:0;"><strong>Last updated:</strong> <span id="ha_policy_time">–</span></p>
-    </div>
-    <div class="grid">
-      <div class="card" id="ha_card_discharge">
-        <h3>Patient Discharge Trigger</h3>
-        <div class="row" style="gap:8px;">
-          <select id="ha_patient_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
-            <option value="">Select patient…</option>
-          </select>
-          <input id="ha_patient" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn primary" onclick="runHealthAgent('discharge', { patient_id: val('ha_patient') })">Run Discharge</button>
-        </div>
-      </div>
+    <p style="color:var(--muted); margin-top:-8px;">Hospital Discharge agents and prompts powered by the Prompt Studio configuration.</p>
 
-      <div class="card" id="ha_card_agentic">
-        <h3>Agentic Referral (LLM plan)</h3>
-        <div class="row" style="gap:8px;">
-          <select id="ha_patient_agentic_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
-            <option value="">Select patient…</option>
-          </select>
-          <input id="ha_patient_agentic" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn primary" onclick="runHealthAgent('agenticReferral', { patient_id: val('ha_patient_agentic'), context: {} })">Run Agentic Referral</button>
-        </div>
-      </div>
-
-      <div class="card" id="ha_card_consent">
-        <h3>Consent Check</h3>
-        <div class="row" style="gap:8px;">
-          <select id="ha_patient_con_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
-            <option value="">Select patient…</option>
-          </select>
-          <input id="ha_patient_con" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <input id="ha_recipient" placeholder="Recipient ref (e.g., Practitioner/prov-002)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <input id="ha_action" placeholder="Action (e.g., disclose)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <input id="ha_pou" placeholder="Purpose (e.g., treatment)" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <button class="btn primary" onclick="runHealthAgent('consent', { patient_id: val('ha_patient_con'), recipient_ref: val('ha_recipient'), action: val('ha_action'), purpose_of_use: val('ha_pou') })">Run Consent Check</button>
-        </div>
-      </div>
-
-      <div class="card" id="ha_card_travel">
-        <h3>Travel (Uber Booking)</h3>
-        <div class="row" style="gap:8px;">
-          <select id="ha_patient_travel_sel" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px; min-width:220px;">
-            <option value="">Select patient…</option>
-          </select>
-          <input id="ha_patient_travel" placeholder="Or type Patient ID" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:8px;" />
-          <select id="ha_travel_purpose" style="max-width:260px;">
-            <option value="discharge_transport">Discharge transport</option>
-            <option value="appointment_transport">Appointment transport</option>
-          </select>
-          <button class="btn primary" onclick="runHealthAgent('uber', { patient_id: val('ha_patient_travel'), purpose: val('ha_travel_purpose') })">Book Uber</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid" style="margin-top:12px;">
-      <div class="card">
-        <h3>Result (Messaging)</h3>
-        <pre id="ha_result_json" style="white-space:pre-wrap; overflow:auto; max-height:40vh; background:#0b1020; color:#c7e1ff; padding:12px; border-radius:8px;"></pre>
-      </div>
-      <div class="card">
-        <h3>Result (Natural Language)</h3>
-        <div id="ha_result_text" style="padding:12px; line-height:1.5; color:#1f2937;"></div>
-      </div>
-      <div class="card">
-        <h3>Execution Graph (Agent Flows)</h3>
-        <p style="color:var(--muted); margin-top:-4px; font-size:12px;">Each run of a Health use case appends a new flow showing UI → backend → MCP tools → LLM planners and actions.</p>
-        <div id="ha_graph" style="max-height:40vh; overflow:auto; padding:8px; background:#f9fafb; border-radius:8px; font-size:12px;"></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px;">
+    <div class="card" style="margin-top:8px;">
       <div class="row" style="justify-content: space-between; align-items: center; margin-bottom:8px;">
         <h3 style="margin:0;">Hospital Discharge Coordination</h3>
         <span style="font-size:12px; color:var(--muted);">Demo panel using mock inpatient + risk data (LACE+ / HOSPITAL).</span>
@@ -1605,26 +1531,256 @@ ASSISTANT:
       { patientId:'P0020', name:'Grace Thompson', ward:'General Medicine', lace:8, laceRisk:'MODERATE', hosp:3, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false }
     ];
 
-    function hdColour(risk) {
-      if (!risk) return 'pill';
-      const r = risk.toUpperCase();
+    function renderHdPanel() {
+      const kpiEl = document.getElementById('hd_kpi_strip');
+      const tbody = document.getElementById('hd_inpatient_tbody');
+      const stepsEl = document.getElementById('hd_step_cards');
+      if (!kpiEl || !tbody || !stepsEl) return;
 
-  runHealthAgent(kind, payload);
-}
-    function writeResults(kind, data, append) {
-      const jsonEl = document.getElementById('ha_result_json');
-      const textEl = document.getElementById('ha_result_text');
-      if (!jsonEl || !textEl) return;
-      const title = { discharge:'Discharge', agenticReferral:'Agentic Referral', consent:'Consent', uber:'Travel' }[kind] || kind;
-      const jsonBlock = JSON.stringify(data, null, 2);
-      const nlBlock = `<h4 style="margin:0 0 6px;">${title}</h4>` + formatResult(kind, data);
-      if (!append) {
-        jsonEl.textContent = jsonBlock;
-        textEl.innerHTML = nlBlock;
-      } else {
-        jsonEl.textContent = (jsonEl.textContent ? (jsonEl.textContent + '\n\n') : '') + `=== ${title} ===\n` + jsonBlock;
-        textEl.innerHTML = textEl.innerHTML + '<hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">' + nlBlock;
+      const total = HD_PATIENTS.length;
+      const high = HD_PATIENTS.filter(p => p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH').length;
+      const monitored = HD_PATIENTS.filter(p => p.status.indexOf('Ready') >= 0).length;
+      const gp7d = Math.round((total - 3) / total * 100);
+      const medRecon = 92;
+      const readmit30 = 14;
+
+      kpiEl.innerHTML = '';
+      const tiles = [
+        { label:'30-day readmission rate', value: readmit30 + '%'},
+        { label:'% with GP follow-up ≤7 days', value: gp7d + '%'},
+        { label:'Medication reconciliation completion %', value: medRecon + '%'},
+        { label:'High-risk discharges under active monitoring', value: monitored + ' / ' + high }
+      ];
+      tiles.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<div style="color:var(--muted); font-weight:600;">${t.label}</div><div style="font-size:22px; font-weight:800;">${t.value}</div>`;
+        kpiEl.appendChild(card);
+      });
+
+      tbody.innerHTML = '';
+      HD_PATIENTS.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.dataset.patientId = p.patientId;
+        const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MOD');
+        const pillCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MOD' ? 'pill warn' : 'pill ok');
+        tr.innerHTML = `
+          <td>${p.name} <span style="display:block; font-size:11px; color:var(--muted);">${p.patientId}</span></td>
+          <td>${p.ward}</td>
+          <td>${p.lace} <span style="display:block; font-size:11px; color:var(--muted);">${p.laceRisk}</span></td>
+          <td>${p.hosp} <span style="display:block; font-size:11px; color:var(--muted);">${p.hospRisk}</span></td>
+          <td><span class="${pillCls}">${riskLabel}</span></td>
+          <td>${p.status}</td>
+        `;
+        tr.addEventListener('click', () => selectHdPatient(p.patientId));
+        tbody.appendChild(tr);
+      });
+
+      if (HD_PATIENTS[0]) selectHdPatient(HD_PATIENTS[0].patientId);
+    }
+
+    function selectHdPatient(patientId) {
+      const p = HD_PATIENTS.find(x => x.patientId === patientId);
+      window.__hdSelectedPatientId = p ? p.patientId : null;
+      const selEl = document.getElementById('hd_selected_patient');
+      const stepsEl = document.getElementById('hd_step_cards');
+      if (!selEl || !stepsEl) return;
+      if (!p) {
+        selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
+        stepsEl.innerHTML = '';
+        return;
       }
+      selEl.innerHTML = `<strong>${p.name}</strong> • ${p.patientId} • ${p.ward}`;
+
+      const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE');
+      const riskCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MODERATE' ? 'pill warn' : 'pill ok');
+
+      const steps = [
+        {
+          id:'step1',
+          title:'Step 1 • Discharge Readiness & Risk',
+          body:`<p><strong>LACE+:</strong> ${p.lace} (${p.laceRisk}) &nbsp; <strong>HOSPITAL:</strong> ${p.hosp} (${p.hospRisk})</p>
+                <p><strong>Overall risk:</strong> <span class="${riskCls}">${riskLabel}</span></p>
+                <p><strong>Flags:</strong> ${p.atsi ? 'ATSI; ' : ''}${p.ndis ? 'NDIS participant; ' : ''}${(!p.atsi && !p.ndis) ? 'None recorded.' : ''}</p>
+                <div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep('step1')">Run Step 1 Agent</button></div>`
+        },
+        {
+          id:'step2',
+          title:'Step 2 • Med Reconciliation',
+          body:'<p>Status: <span class="pill ok">Completed (mock)</span></p><p>Discrepancies: 1–2 typical per patient. Open generated PDF pack from the Medication Reconciliation Agent in the real console.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step2\')">Run Step 2 Agent</button></div>'
+        },
+        {
+          id:'step3',
+          title:'Step 3 • Follow-Up',
+          body:'<p>GP and specialist appointments scheduled (mock).</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step3\')">Run Step 3 Agent</button></div>'
+        },
+        {
+          id:'step4',
+          title:'Step 4 • GP & Community Handoff',
+          body:'<p>GP summary sent (mock). Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step4\')">Run Step 4 Agent</button></div>'
+        },
+        {
+          id:'step5',
+          title:'Step 5 • Monitoring',
+          body:`<p>Day 1–30 avatar check-ins configured (mock). High-risk patients like ${p.name} would receive tighter monitoring.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep('step5')">Run Step 5 Agent</button></div>`
+        },
+        {
+          id:'step6',
+          title:'Step 6 • Outcomes',
+          body:'<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step6\')">Run Step 6 Agent</button></div>'
+        }
+      ];
+
+      stepsEl.innerHTML = '';
+      steps.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<h4 style="margin:4px 0 6px;">${s.title}</h4>${s.body}`;
+        stepsEl.appendChild(card);
+      });
+    }
+
+    function runHdStep(stepId) {
+      const pid = window.__hdSelectedPatientId;
+      if (!pid) { showToast('Select a patient in Hospital Discharge panel first.'); return; }
+      const p = HD_PATIENTS.find(x => x.patientId === pid);
+      if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
+      let payload;
+      const kind = 'hd_' + stepId;
+
+      if (stepId === 'step1') {
+        payload = {
+          patient_id: pid,
+          encounter_id: 'ENC' + pid.slice(1),
+          summary: [
+            `Ward: ${p.ward}, risk band ${p.laceRisk}/${p.hospRisk}.`,
+            p.atsi || p.ndis ? 'Additional flags present (ATSI/NDIS).' : 'No ATSI/NDIS flags recorded.'
+          ],
+          discharge_readiness: p.status.indexOf('Ready') >= 0 ? 'READY_24_48H' : 'NOT_READY',
+          lace_plus_risk_level: p.laceRisk,
+          hospital_risk_level: p.hospRisk,
+          overall_risk_band: (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE'),
+          recommended_bundle: (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE'),
+          key_risk_drivers: [p.ward, p.laceRisk + ' LACE+']
+        };
+        payload.llm_reasoning = [
+          'Identify ward and risk factors from LACE+ and HOSPITAL scores.',
+          'If either score is HIGH, set overall_risk_band and recommended_bundle to HIGH.',
+          'If both scores are LOW, classify as LOW; otherwise classify as MODERATE.',
+          'Use discharge status text (Ready vs Planning) to set discharge_readiness.'
+        ];
+      } else if (stepId === 'step2') {
+        payload = {
+          patient_id: pid,
+          encounter_id: 'ENC' + pid.slice(1),
+          reconciliation: {
+            continued: ['Frusemide'],
+            stopped: [],
+            started: ['Education pack'],
+            changed: []
+          },
+          safety_flags: ['High-risk medicines require counselling (mock).'],
+          education_points: ['We will give you written information about how and when to take your heart and lung medicines.']
+        };
+        payload.llm_reasoning = [
+          'Compare home, in-hospital and proposed discharge medicines.',
+          'Classify meds as continued, stopped, started or changed.',
+          'Flag high-risk medicines that need explicit counselling.',
+          'Generate short, patient-friendly education points.'
+        ];
+      } else if (stepId === 'step3') {
+        payload = {
+          patient_id: pid,
+          encounter_id: 'ENC' + pid.slice(1),
+          required_followups: [
+            {
+              type: 'GP',
+              reason: 'Post-discharge review',
+              recommended_timeframe: 'within 7 days',
+              status: 'ALREADY_SCHEDULED',
+              scheduled_details: {}
+            }
+          ]
+        };
+        payload.llm_reasoning = [
+          'Use discharge context and risk band to determine required follow-ups.',
+          'Check scheduled appointments to see what is already booked.',
+          'Mark remaining requirements as MISSING to be booked.'
+        ];
+      } else if (stepId === 'step4') {
+        payload = {
+          patient_id: pid,
+          encounter_id: 'ENC' + pid.slice(1),
+          gp_handoff: {
+            gp_id: 'GP0001',
+            summary_bullets: ['Hospital stay summary (mock).'],
+            gp_action_items: ['Review discharge meds and follow-up plan.']
+          },
+          community_handoff: []
+        };
+        payload.llm_reasoning = [
+          'Summarise the admission for the GP from diagnoses, procedures and hospital course.',
+          'Turn discharge meds and follow-up plan into clear action items.',
+          'Determine which community services should receive referrals.'
+        ];
+      } else if (stepId === 'step5') {
+        const now = new Date();
+        const in48 = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
+        payload = {
+          patient_id: pid,
+          encounter_id: 'ENC' + pid.slice(1),
+          next_check_in: {
+            scheduled_time: in48,
+            channel: 'APP',
+            questions: ['How are your breathing and energy today?']
+          },
+          alerts: []
+        };
+        payload.llm_reasoning = [
+          'Use monitoring plan and risk band to choose the next check-in time and channel.',
+          'Tailor questions to the patient’s condition and risk level.',
+          'Inspect recent responses for deterioration or non-adherence.'
+        ];
+      } else if (stepId === 'step6') {
+        payload = {
+          dashboard_period: {
+            start_date: '2025-11-01',
+            end_date: '2025-11-30'
+          },
+          kpis: {
+            readmission_30d_rate: 0.18,
+            gp_followup_7d_completion: 0.72,
+            med_reconciliation_completion: 0.88,
+            avg_los_days: 5.4,
+            baseline_avg_los_days: 6.2
+          },
+          insights: ['This patient contributes to the current discharge cohort (mock).']
+        };
+        payload.llm_reasoning = [
+          'Aggregate outcomes for the dashboard period from OUTCOME_METRICS.',
+          'Compute readmission rate, GP follow-up completion and med reconciliation completion.',
+          'Compare LOS against baseline and surface high-level insights.'
+        ];
+      }
+
+      if (!payload) return;
+      writeResults(kind, payload, !!window.__appendMode);
+      renderHdLogic(stepId, payload);
+      window.__appendMode = true;
+      showToast('Executed Hospital Discharge ' + stepId + ' agent (demo).');
+    }
+
+    function renderHdLogic(stepId, payload) {
+      const el = document.getElementById('hd_llm_logic');
+      if (!el) return;
+      const lines = (payload && payload.llm_reasoning) || [];
+      const header = `Step: ${stepId}\n`;
+      if (!lines.length) {
+        el.textContent = header + '(No reasoning metadata attached in this demo payload.)';
+        return;
+      }
+      el.textContent = header + lines.map(l => '• ' + l).join('\n');
     }
 
     function openQuickRun() {
