@@ -362,6 +362,13 @@
         <h4 style="margin:4px 0 6px;">LLM Decision Logic (Demo)</h4>
         <p style="color:var(--muted); font-size:12px; margin-top:-4px;">When you run a Hospital Discharge step, this shows the reasoning the (mock) LLM agent used based on the CSV-backed patient and risk data.</p>
         <div id="hd_llm_logic" style="white-space:pre-wrap; font-size:12px; color:var(--muted); padding:8px; background:#f9fafb; border-radius:8px; border:1px solid var(--border);"></div>
+        <div style="margin-top:8px;">
+          <h4 style="margin:4px 0 6px;">Health Agent Result</h4>
+          <div class="split" style="gap:8px;">
+            <pre id="ha_result_json" style="white-space:pre-wrap; overflow:auto; max-height:30vh; background:#0b1020; color:#c7e1ff; padding:8px; border-radius:8px;"></pre>
+            <div id="ha_result_text" style="font-size:13px; line-height:1.5; color:#1f2937;"></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1496,6 +1503,66 @@ ASSISTANT:
         uber: '/demo/uber'
       }
     };
+
+    async function runHealthAgent(kind, payload, options) {
+      const opts = options || {};
+      const ep = (HEALTH_API.endpoints || {})[kind];
+      if (!ep) {
+        showToast('Unknown Health flow: ' + kind);
+        return null;
+      }
+      const url = (HEALTH_API.baseUrl || '') + ep;
+      const body = payload || {};
+      showToast('Running Health flow: ' + kind + '…');
+      let data = null;
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast('Health flow ' + kind + ' failed (HTTP ' + res.status + ')');
+        } else {
+          showToast('Health flow ' + kind + ' completed');
+        }
+      } catch (e) {
+        data = { error: String(e) };
+        showToast('Request error for Health flow: ' + kind);
+      }
+      try {
+        writeResults(kind, data, !!opts.append);
+        appendExecutionGraph(kind, body, data);
+      } catch (e) {}
+      return data;
+    }
+
+    function writeResults(kind, data, append) {
+      const jsonEl = document.getElementById('ha_result_json');
+      const textEl = document.getElementById('ha_result_text');
+      if (!jsonEl && !textEl) return;
+      if (!append) {
+        if (jsonEl) jsonEl.textContent = '';
+        if (textEl) textEl.innerHTML = '';
+      }
+      if (jsonEl) {
+        const pretty = JSON.stringify(data, null, 2);
+        if (append && jsonEl.textContent) {
+          jsonEl.textContent = jsonEl.textContent + '\n\n' + pretty;
+        } else {
+          jsonEl.textContent = pretty;
+        }
+      }
+      if (textEl) {
+        const html = formatResult(kind, data);
+        if (append && textEl.innerHTML) {
+          textEl.innerHTML = textEl.innerHTML + html;
+        } else {
+          textEl.innerHTML = html;
+        }
+      }
+    }
 
     // CoO / Billing via MCP-backed backend (Ownership Trigger service wraps CoO MCP tools)
     const COO_API = {
