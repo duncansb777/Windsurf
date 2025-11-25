@@ -1,0 +1,4 @@
+PROTOCOL_ID,CONDITION,RISK_BAND,DAY_1_CHECK,DAY_7_CHECK,DAY_30_CHECK
+PD0001,Heart failure,HIGH,Phone nurse review,Clinic review,Specialist review
+PD0002,COPD,HIGH,Avatar symptom check,GP review,Respiratory clinic
+PD0003,General medical,MODERATE,Avatar symptom check,GP review,None

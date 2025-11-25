@@ -395,6 +395,39 @@
         <div id="ha_graph" style="max-height:40vh; overflow:auto; padding:8px; background:#f9fafb; border-radius:8px; font-size:12px;"></div>
       </div>
     </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="row" style="justify-content: space-between; align-items: center; margin-bottom:8px;">
+        <h3 style="margin:0;">Hospital Discharge Coordination</h3>
+        <span style="font-size:12px; color:var(--muted);">Demo panel using mock inpatient + risk data (LACE+ / HOSPITAL).</span>
+      </div>
+      <div class="metrics" id="hd_kpi_strip" style="margin-bottom:12px;"></div>
+      <div class="split">
+        <div>
+          <h4 style="margin:4px 0 8px;">Inpatients &amp; Risk</h4>
+          <div class="card" style="padding:0; box-shadow:none;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Ward / Service</th>
+                  <th>LACE+</th>
+                  <th>HOSPITAL</th>
+                  <th>Risk</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="hd_inpatient_tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h4 style="margin:4px 0 8px;">Discharge Bundle (Selected Patient)</h4>
+          <div id="hd_selected_patient" style="font-size:13px; color:var(--muted); margin-bottom:4px;">Select a patient to view their 6-step discharge bundle.</div>
+          <div class="grid" style="grid-template-columns:1fr; gap:8px;" id="hd_step_cards"></div>
+        </div>
+      </div>
+    </div>
   </section>
 
     <!-- Screen 2: Escalations Inbox -->
@@ -583,6 +616,12 @@
               <li><button class="btn" data-pack="GWW – Grange Billing Twin v0.9" data-domain="water">GWW – Grange Billing Twin v0.9</button></li>
               <li><button class="btn" data-pack="Australian Health Privacy Regulations" data-domain="health">Australian Health Privacy Regulations</button></li>
               <li><button class="btn" data-pack="Patient Discharge Process" data-domain="health">Patient Discharge Process</button></li>
+              <li><button class="btn" data-pack="Hospital – Discharge Readiness & Risk Agent" data-domain="health">Hospital – Discharge Readiness &amp; Risk</button></li>
+              <li><button class="btn" data-pack="Hospital – Medication Reconciliation Agent" data-domain="health">Hospital – Med Reconciliation</button></li>
+              <li><button class="btn" data-pack="Hospital – Follow-Up Orchestration Agent" data-domain="health">Hospital – Follow-Up Orchestration</button></li>
+              <li><button class="btn" data-pack="Hospital – GP &amp; Community Handoff Agent" data-domain="health">Hospital – GP &amp; Community Handoff</button></li>
+              <li><button class="btn" data-pack="Hospital – Post-Discharge Monitoring Agent" data-domain="health">Hospital – Post-Discharge Monitoring</button></li>
+              <li><button class="btn" data-pack="Hospital – Outcomes &amp; Governance Analytics Agent" data-domain="health">Hospital – Outcomes &amp; Governance</button></li>
             </ul>
           </div>
         </aside>
@@ -845,6 +884,455 @@
       }
     };
 
+    // Prompt Studio packs (Water + Health, including Hospital Discharge agents)
+    const PROMPT_PACKS = {
+      'SA Water – CoO Core v1.3': {
+        domain: 'water',
+        title: 'SA Water – CoO Core v1.3',
+        desc: 'Core prompts for Change of Ownership billing flows.',
+        affects: 'Balance Transfer Agent • Ownership Trigger Agent • Special Read Scheduler Agent',
+        instructions: document.getElementById('packInstructions')?.value || ''
+      },
+      'SA Water – Vulnerable Customer Handling v1.1': {
+        domain: 'water',
+        title: 'SA Water – Vulnerable Customer Handling v1.1',
+        desc: 'Guidance to protect vulnerable customers during billing and change-of-ownership flows.',
+        affects: 'Balance Transfer Agent • Ownership Trigger Agent • Special Read Scheduler Agent',
+        instructions: document.getElementById('packInstructions')?.value || ''
+      },
+      'GWW – Grange Billing Twin v0.9': {
+        domain: 'water',
+        title: 'GWW – Grange Billing Twin v0.9',
+        desc: 'Billing twin prompts for GWW demo (CoO + meter reads).',
+        affects: 'Balance Transfer Agent • Ownership Trigger Agent',
+        instructions: 'Placeholder instructions for GWW – Grange Billing Twin v0.9.'
+      },
+      'Australian Health Privacy Regulations': {
+        domain: 'health',
+        title: 'Australian Health Privacy Regulations',
+        desc: 'High-level prompts to apply Australian health privacy regulations across Health agents.',
+        affects: 'All Health Agents',
+        instructions: 'Placeholder summary of APP 6/11, state Health Records Acts, and data minimisation guardrails.'
+      },
+      'Patient Discharge Process': {
+        domain: 'health',
+        title: 'Patient Discharge Process',
+        desc: 'High-level prompts for patient discharge coordination across Health agents.',
+        affects: 'Patient Discharge Trigger • Agentic Referral • Consent • Travel',
+        instructions: 'Placeholder instructions for the overall Patient Discharge Process pack.'
+      },
+      'Hospital – Discharge Readiness & Risk Agent': {
+        domain: 'health',
+        title: 'Hospital – Discharge Readiness & Risk Agent',
+        desc: 'LLM prompt for the Discharge Readiness & Risk Agent (LACE+ / HOSPITAL style factors).',
+        affects: 'discharge_readiness_agent',
+        instructions: `SYSTEM:
+You are the Discharge Readiness & Risk Agent for a hospital.
+Your goal is to:
+1) Assess whether the patient is likely to be ready for discharge in the next 24–48 hours;
+2) Estimate readmission risk using LACE+ and HOSPITAL-style factors;
+3) Recommend which discharge pathway bundle the team should use (LOW / MODERATE / HIGH risk).
+
+You must be conservative and safety-first. If data is missing or ambiguous, treat the risk as higher, not lower.
+
+You are part of an Agentic Engine. Your output will be displayed in the Hospital Discharge panel of the Health screen in an Agentic Control Console.
+
+CONTEXT (from CSVs):
+- Current inpatient encounter:
+{{encounter_context}}   # from PAS_ADMISSION_ENCOUNTER
+- Patient demographics and social factors:
+{{demographics_context}}   # from EMR_PATIENT_DEMOGRAPHICS, EMR_SOCIAL_HISTORY
+- Diagnoses and procedures:
+{{diagnosis_context}}      # from EMR_DIAGNOSIS, EMR_PROCEDURE
+- Recent ED visits and admissions:
+{{history_context}}        # from PAS_HISTORICAL_ENCOUNTERS
+- Vitals and key labs:
+{{vitals_labs_context}}    # from EMR_VITALS, EMR_LAB_RESULTS
+- Pre-computed risk scores (if available):
+{{risk_scores_context}}    # from RISK_SCORE_LACE_PLUS, RISK_SCORE_HOSPITAL
+
+ASSISTANT:
+Using the context, do the following:
+
+1) Summarise in 2–3 bullet points:
+   - Current clinical status relevant to discharge (stable/unstable, oxygen, mobility, cognition).
+   - Key risk drivers (e.g., heart failure, COPD, polypharmacy, recent ED usage, lives alone, language barrier).
+
+2) Assign:
+   - discharge_readiness: one of ["NOT_READY", "POSSIBLY_READY_24H", "READY_24_48H", "READY_NOW"]
+   - lace_plus_risk_level: ["LOW", "MODERATE", "HIGH"]
+   - hospital_risk_level: ["LOW", "INTERMEDIATE", "HIGH"]
+   - overall_risk_band: ["LOW", "MODERATE", "HIGH"]
+
+3) Recommend a discharge pathway bundle:
+   - For LOW risk: standard discharge bundle with basic education and 1 GP follow-up.
+   - For MODERATE risk: enhanced bundle with detailed education, GP + specialist follow-up and early check-in.
+   - For HIGH risk: intensive bundle including community services, frequent monitoring, rapid escalation criteria.
+
+4) Output strict JSON only with this structure:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "summary": [
+    "<bullet 1>",
+    "<bullet 2>",
+    "<bullet 3>"
+  ],
+  "discharge_readiness": "<see above>",
+  "lace_plus_risk_level": "<see above>",
+  "hospital_risk_level": "<see above>",
+  "overall_risk_band": "<see above>",
+  "recommended_bundle": "<LOW|MODERATE|HIGH>",
+  "key_risk_drivers": [
+    "<short phrase>",
+    "<short phrase>"
+  ]
+}`
+      },
+      'Hospital – Medication Reconciliation Agent': {
+        domain: 'health',
+        title: 'Hospital – Medication Reconciliation & Education Agent',
+        desc: 'LLM prompt for the Medication Reconciliation & Education Agent.',
+        affects: 'medication_reconciliation_agent',
+        instructions: `SYSTEM:
+You are the Medication Reconciliation & Education Agent.
+Your tasks are:
+1) Compare home, in-hospital and proposed discharge medications.
+2) Identify discrepancies, potential safety issues and polypharmacy concerns.
+3) Generate clear patient-friendly education points for the final discharge medication list.
+
+You must:
+- Be conservative about safety.
+- Flag high-risk medicines explicitly (e.g., anticoagulants, insulin, opioids).
+- Avoid changing orders yourself – you only RECOMMEND and EXPLAIN.
+
+CONTEXT:
+- Home medications before admission:
+{{home_meds_context}}       # from EMR_HOME_MEDICATIONS
+- In-hospital active medications:
+{{hospital_meds_context}}   # from EMR_MEDICATIONS
+- Proposed discharge medications:
+{{discharge_meds_context}}  # from EMR_DISCHARGE_MEDICATIONS
+- Relevant diagnoses/conditions:
+{{diagnosis_context}}       # from EMR_DIAGNOSIS
+- Medication risk metadata:
+{{medication_reference}}    # high-risk flags, class, etc.
+
+ASSISTANT:
+1) Produce a concise reconciliation summary:
+   - medications_continued
+   - medications_stopped
+   - medications_started
+   - medication_changes (dose/route/frequency changes)
+
+2) Highlight safety issues (if any):
+   - therapeutic duplication
+   - high-risk meds needing explicit counselling
+   - obvious contraindications based on diagnoses
+
+3) Create patient-friendly education points (short, simple language):
+   - 1–3 bullets per high-risk or clinically important medicine.
+
+4) Output strict JSON only:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "reconciliation": {
+    "continued": ["<drug A>", "<drug B>"],
+    "stopped": ["<drug C>"],
+    "started": ["<drug D>"],
+    "changed": [
+      {
+        "medication": "<name>",
+        "change": "<brief description>"
+      }
+    ]
+  },
+  "safety_flags": [
+    "<short safety issue, if any>"
+  ],
+  "education_points": [
+    "<short, patient-friendly bullet point>",
+    "<…>"
+  ]
+}`
+      },
+      'Hospital – Follow-Up Orchestration Agent': {
+        domain: 'health',
+        title: 'Hospital – Follow-Up Orchestration Agent',
+        desc: 'LLM prompt for the Follow-Up Orchestration Agent.',
+        affects: 'followup_orchestration_agent',
+        instructions: `SYSTEM:
+You are the Follow-Up Orchestration Agent.
+Your job is to ensure each discharged patient has the right mix of follow-up appointments booked and clearly documented.
+
+You DO NOT directly access booking systems; instead you:
+- Decide what appointments are clinically required.
+- Check what is already booked.
+- Recommend what still needs to be booked, when, and with whom.
+
+CONTEXT:
+- Discharge diagnoses, procedures and risk band:
+{{discharge_context}}            # from EMR_DIAGNOSIS, EMR_PROCEDURE, risk agent output
+- Required follow-up rules:
+{{required_followup_rules}}      # from REQUIRED_FOLLOW_UP_APPOINTMENTS
+- Existing scheduled appointments:
+{{scheduled_appointments}}       # from APPOINTMENT_SCHEDULE
+- GP and specialist directory (if relevant):
+{{provider_directory}}           # from EHR_GP_INFORMATION, SPECIALIST_DIRECTORY
+
+ASSISTANT:
+1) Determine required follow-ups (e.g. GP in 3–5 days, cardiology in 2–4 weeks, pathology in 1 week).
+2) Compare with already scheduled appointments and mark:
+   - "already_scheduled"
+   - "missing" (to be booked)
+
+3) For missing appointments, propose:
+   - type (GP, cardiology, respiratory, pathology, allied health)
+   - recommended time window
+   - urgency band (LOW/MODERATE/HIGH)
+
+4) Output strict JSON only:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "required_followups": [
+    {
+      "type": "<GP|Specialist|Pathology|AlliedHealth>",
+      "reason": "<clinical reason>",
+      "recommended_timeframe": "<e.g. within 7 days>",
+      "status": "<ALREADY_SCHEDULED|MISSING>",
+      "scheduled_details": {
+        "appointment_id": "<if exists>",
+        "date_time": "<ISO8601>",
+        "provider_name": "<if known>"
+      }
+    }
+  ]
+}`
+      },
+      'Hospital – GP & Community Handoff Agent': {
+        domain: 'health',
+        title: 'Hospital – GP & Community Handoff Agent',
+        desc: 'LLM prompt for the GP & Community Handoff Agent.',
+        affects: 'gp_community_handoff_agent',
+        instructions: `SYSTEM:
+You are the GP & Community Handoff Agent.
+Your tasks:
+1) Summarise the hospital stay in a GP-friendly way.
+2) Highlight what the GP and community services need to do.
+3) Produce structured handoff objects that can be sent by secure messaging and logged in databases.
+
+CONTEXT:
+- Core clinical summary (diagnoses, procedures, hospital course):
+{{clinical_summary_context}}     # from EMR_DIAGNOSIS, EMR_PROCEDURE, EMR_CLINICAL_NOTES
+- Discharge medication summary:
+{{medication_summary}}           # from medication agent output
+- Follow-up plan and risk band:
+{{followup_plan}}                # from followup agent output and risk agent output
+- GP and community services data:
+{{gp_info}}                      # from EHR_GP_INFORMATION
+{{community_services}}           # from COMMUNITY_SERVICES_DIRECTORY
+
+ASSISTANT:
+1) Produce a succinct GP summary (max ~10 bullet points), covering:
+   - reason for admission and key diagnoses
+   - key in-hospital events/procedures
+   - current problems and risks
+   - discharge medications (high level)
+   - follow-up and monitoring plan
+
+2) Capture clear GP actions and community service actions.
+
+3) Output strict JSON only:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "gp_handoff": {
+    "gp_id": "<GP_IDENTIFIER>",
+    "summary_bullets": [
+      "<bullet>",
+      "<bullet>"
+    ],
+    "gp_action_items": [
+      "<action item>"
+    ]
+  },
+  "community_handoff": [
+    {
+      "service_id": "<COMMUNITY_SERVICE_ID>",
+      "service_name": "<name>",
+      "reason_for_referral": "<short text>",
+      "priority": "<LOW|MEDIUM|HIGH>",
+      "requested_followup": "<e.g. home visit within 48h>"
+    }
+  ]
+}`
+      },
+      'Hospital – Post-Discharge Monitoring Agent': {
+        domain: 'health',
+        title: 'Hospital – Post-Discharge Monitoring Agent',
+        desc: 'LLM prompt for the Post-Discharge Monitoring Agent.',
+        affects: 'post_discharge_monitoring_agent',
+        instructions: `SYSTEM:
+You are the Post-Discharge Monitoring Agent.
+You work with a digital avatar channel to:
+1) Run scheduled check-ins with patients.
+2) Interpret their responses for early signs of deterioration.
+3) Recommend early intervention actions.
+
+You do not override clinicians. You propose alerts and suggested actions.
+
+CONTEXT:
+- Monitoring plan and thresholds:
+{{monitoring_plan}}           # from POST_DISCHARGE_MONITORING_PLAN
+- Recent avatar interactions:
+{{avatar_check_ins}}          # from AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA
+- Clinical risk band:
+{{risk_band}}                 # from risk agent
+
+ASSISTANT:
+1) For the next scheduled check-in window, propose:
+   - check-in type (SMS, app, phone)
+   - 3–5 short questions tailored to the condition and risk band.
+
+2) Review recent patient responses and decide if any alert should be raised:
+   - symptom worsening
+   - medication non-adherence
+   - social or practical red flags (can’t get to GP, no transport, etc.)
+
+3) If alert is needed, suggest:
+   - alert_priority: ["INFO", "WATCH", "ESCALATE"]
+   - recommended_action: e.g. "nurse calls patient within 2 hours", "flag for GP review", etc.
+
+4) Output strict JSON only:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "next_check_in": {
+    "scheduled_time": "<ISO8601>",
+    "channel": "<SMS|APP|PHONE>",
+    "questions": [
+      "<short question>",
+      "<short question>"
+    ]
+  },
+  "alerts": [
+    {
+      "alert_id": "<generated>",
+      "priority": "<INFO|WATCH|ESCALATE>",
+      "reason": "<short text>",
+      "recommended_action": "<short text>"
+    }
+  ]
+}`
+      },
+      'Hospital – Outcomes & Governance Analytics Agent': {
+        domain: 'health',
+        title: 'Hospital – Outcomes & Governance Analytics Agent',
+        desc: 'LLM prompt for the Outcomes & Governance Analytics Agent.',
+        affects: 'discharge_outcomes_analytics_agent',
+        instructions: `SYSTEM:
+You are the Outcomes & Governance Analytics Agent.
+You aggregate discharge pathway performance for clinical governance and business value tracking.
+
+Your goals:
+- Track readmissions, ED returns, follow-up completion, and adherence to recommended bundles.
+- Surface insights the Discharge Coordination steering group can act on.
+
+CONTEXT:
+- Outcome tracking data (per patient):
+{{outcome_tracking}}        # from OUTCOME_TRACKING
+- Aggregated KPIs:
+{{performance_metrics}}     # from PERFORMANCE_METRICS
+- Notes and improvement ideas:
+{{improvement_log}}         # from CONTINUOUS_IMPROVEMENT_LOG
+
+ASSISTANT:
+1) Compute (or summarise if pre-computed) the following for the dashboard:
+   - 30-day readmission rate (overall and by risk band).
+   - % of patients with GP follow-up ≤7 days.
+   - % with completed medication reconciliation.
+   - Average LOS vs baseline.
+   - Any financial impact metrics provided.
+
+2) Identify 3–5 key insights or trends that leadership should see, e.g.:
+   - "High-risk HF patients with no GP follow-up ≤7 days have much higher readmission."
+   - "Ward X consistently delays discharge summaries."
+
+3) Output strict JSON only:
+
+{
+  "dashboard_period": {
+    "start_date": "<YYYY-MM-DD>",
+    "end_date": "<YYYY-MM-DD>"
+  },
+  "kpis": {
+    "readmission_30d_rate": 0.18,
+    "gp_followup_7d_completion": 0.72,
+    "med_reconciliation_completion": 0.88,
+    "avg_los_days": 5.4,
+    "baseline_avg_los_days": 6.2
+  },
+  "insights": [
+    "<insight 1>",
+    "<insight 2>",
+    "<insight 3>"
+  ]
+}`
+      }
+    };
+
+    function initPromptStudio() {
+      const domainSel = document.getElementById('studioDomain');
+      const packButtons = Array.from(document.querySelectorAll('#packList button'));
+      const titleEl = document.getElementById('packTitle');
+      const descEl = document.getElementById('packDesc');
+      const affectsEl = document.getElementById('packAffects');
+      const instrEl = document.getElementById('packInstructions');
+      if (!domainSel || !packButtons.length || !titleEl || !descEl || !affectsEl || !instrEl) return;
+
+      function applyDomainFilter() {
+        const dom = domainSel.value || 'water';
+        packButtons.forEach(btn => {
+          const bDom = btn.dataset.domain || 'water';
+          btn.style.display = (bDom === dom) ? '' : 'none';
+        });
+      }
+
+      function applyPack(name) {
+        const cfg = PROMPT_PACKS[name];
+        if (!cfg) return;
+        titleEl.textContent = cfg.title || name;
+        descEl.textContent = cfg.desc || descEl.textContent;
+        affectsEl.textContent = cfg.affects || affectsEl.textContent;
+        instrEl.value = cfg.instructions || instrEl.value;
+        packButtons.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.pack === name);
+        });
+      }
+
+      packButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const name = btn.dataset.pack;
+          if (name) applyPack(name);
+        });
+      });
+
+      domainSel.addEventListener('change', () => {
+        applyDomainFilter();
+      });
+
+      // Initial state: respect current domain and default to existing water pack
+      applyDomainFilter();
+      applyPack('SA Water – Vulnerable Customer Handling v1.1');
+    }
+
     // Navigation
     const buttons = document.querySelectorAll('#nav button');
     const views = document.querySelectorAll('.view');
@@ -1027,6 +1515,149 @@
       }
     };
 
+    // --- Hospital Discharge mock dataset (20 inpatients + risk scores) ---
+    const HD_PATIENTS = [
+      { patientId:'P0001', name:'John Smith', ward:'Cardiology', lace:13, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Ready 24–48h', atsi:false, ndis:true },
+      { patientId:'P0002', name:'Mary Johnson', ward:'General Medicine', lace:10, laceRisk:'HIGH', hosp:3, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0003', name:'David Lee', ward:'Surgical', lace:1, laceRisk:'LOW', hosp:1, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0004', name:"Patricia O'Connor", ward:'Geriatric Medicine', lace:15, laceRisk:'HIGH', hosp:7, hospRisk:'HIGH', status:'Ready 24–48h', atsi:true, ndis:true },
+      { patientId:'P0005', name:'Ahmed Hassan', ward:'Respiratory', lace:12, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Planning', atsi:false, ndis:true },
+      { patientId:'P0006', name:'Linda Nguyen', ward:'General Medicine', lace:9, laceRisk:'MODERATE', hosp:3, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0007', name:'Robert Brown', ward:'Cardiology', lace:13, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Ready 24–48h', atsi:false, ndis:true },
+      { patientId:'P0008', name:'Susan Wilson', ward:'General Medicine', lace:7, laceRisk:'MODERATE', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0009', name:'Peter Garcia', ward:'Respiratory', lace:11, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Planning', atsi:false, ndis:true },
+      { patientId:'P0010', name:'Angela Martin', ward:'Surgical', lace:6, laceRisk:'MODERATE', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0011', name:'Bruce Tan', ward:'Oncology', lace:15, laceRisk:'HIGH', hosp:7, hospRisk:'HIGH', status:'Ready 24–48h', atsi:false, ndis:true },
+      { patientId:'P0012', name:'Chloe White', ward:'General Medicine', lace:5, laceRisk:'MODERATE', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0013', name:'Jason Kaur', ward:'Cardiology', lace:10, laceRisk:'HIGH', hosp:3, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0014', name:'Elena Petrov', ward:'Respiratory', lace:12, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Ready 24–48h', atsi:false, ndis:false },
+      { patientId:'P0015', name:'George Miller', ward:'Geriatric Medicine', lace:14, laceRisk:'HIGH', hosp:6, hospRisk:'INTERMEDIATE', status:'Ready 24–48h', atsi:false, ndis:true },
+      { patientId:'P0016', name:'Isabel Lopez', ward:'Surgical', lace:7, laceRisk:'MODERATE', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0017', name:'Kevin Adams', ward:'General Medicine', lace:7, laceRisk:'MODERATE', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0018', name:'Nora Ali', ward:'General Medicine', lace:4, laceRisk:'LOW', hosp:2, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false },
+      { patientId:'P0019', name:'Leon Chan', ward:'Cardiology', lace:12, laceRisk:'HIGH', hosp:5, hospRisk:'INTERMEDIATE', status:'Ready 24–48h', atsi:false, ndis:true },
+      { patientId:'P0020', name:'Grace Thompson', ward:'General Medicine', lace:8, laceRisk:'MODERATE', hosp:3, hospRisk:'LOW', status:'Planning', atsi:false, ndis:false }
+    ];
+
+    function hdColour(risk) {
+      if (!risk) return 'pill';
+      const r = risk.toUpperCase();
+      if (r === 'HIGH') return 'pill err';
+      if (r === 'MODERATE' || r === 'INTERMEDIATE') return 'pill warn';
+      return 'pill ok';
+    }
+
+    function renderHdPanel() {
+      const kpiEl = document.getElementById('hd_kpi_strip');
+      const tbody = document.getElementById('hd_inpatient_tbody');
+      const stepsEl = document.getElementById('hd_step_cards');
+      if (!kpiEl || !tbody || !stepsEl) return;
+
+      // Simple mock KPIs derived from dataset
+      const total = HD_PATIENTS.length;
+      const high = HD_PATIENTS.filter(p => p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH').length;
+      const monitored = HD_PATIENTS.filter(p => p.status.indexOf('Ready') >= 0).length;
+      const gp7d = Math.round((total - 3) / total * 100); // mock
+      const medRecon = 92; // mock
+      const readmit30 = 14; // mock
+
+      kpiEl.innerHTML = '';
+      const tiles = [
+        { label:'30-day readmission rate', value: readmit30 + '%', pill:'pill err' },
+        { label:'% with GP follow-up ≤7 days', value: gp7d + '%', pill:'pill ok' },
+        { label:'Medication reconciliation completion %', value: medRecon + '%', pill:'pill ok' },
+        { label:'High-risk discharges under active monitoring', value: monitored + ' / ' + high, pill:'pill warn' }
+      ];
+      tiles.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<div style="color:var(--muted); font-weight:600;">${t.label}</div><div style="font-size:22px; font-weight:800;">${t.value}</div>`;
+        kpiEl.appendChild(card);
+      });
+
+      // Inpatient table
+      tbody.innerHTML = '';
+      HD_PATIENTS.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.dataset.patientId = p.patientId;
+        const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MOD');
+        const pillCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MOD' ? 'pill warn' : 'pill ok');
+        tr.innerHTML = `
+          <td>${p.name} <span style="display:block; font-size:11px; color:var(--muted);">${p.patientId}</span></td>
+          <td>${p.ward}</td>
+          <td>${p.lace} <span style="display:block; font-size:11px; color:var(--muted);">${p.laceRisk}</span></td>
+          <td>${p.hosp} <span style="display:block; font-size:11px; color:var(--muted);">${p.hospRisk}</span></td>
+          <td><span class="${pillCls}">${riskLabel}</span></td>
+          <td>${p.status}</td>
+        `;
+        tr.addEventListener('click', () => selectHdPatient(p.patientId));
+        tbody.appendChild(tr);
+      });
+
+      // Seed right-hand cards with first patient
+      if (HD_PATIENTS[0]) selectHdPatient(HD_PATIENTS[0].patientId);
+    }
+
+    function selectHdPatient(patientId) {
+      const p = HD_PATIENTS.find(x => x.patientId === patientId);
+      const selEl = document.getElementById('hd_selected_patient');
+      const stepsEl = document.getElementById('hd_step_cards');
+      if (!selEl || !stepsEl) return;
+      if (!p) {
+        selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
+        stepsEl.innerHTML = '';
+        return;
+      }
+      selEl.innerHTML = `<strong>${p.name}</strong> • ${p.patientId} • ${p.ward}`;
+
+      const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE');
+      const riskCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MODERATE' ? 'pill warn' : 'pill ok');
+
+      const steps = [
+        {
+          id:'step1',
+          title:'Step 1  b7 Discharge Readiness & Risk',
+          body:`<p><strong>LACE+:</strong> ${p.lace} (${p.laceRisk}) &nbsp; <strong>HOSPITAL:</strong> ${p.hosp} (${p.hospRisk})</p>
+                <p><strong>Overall risk:</strong> <span class="${riskCls}">${riskLabel}</span></p>
+                <p><strong>Flags:</strong> ${p.atsi ? 'ATSI; ' : ''}${p.ndis ? 'NDIS participant; ' : ''}${(!p.atsi && !p.ndis) ? 'None recorded.' : ''}</p>`
+        },
+        {
+          id:'step2',
+          title:'Step 2  b7 Med Reconciliation',
+          body:'<p>Status: <span class="pill ok">Completed (mock)</span></p><p>Discrepancies: 1–2 typical per patient. Open generated PDF pack from the Medication Reconciliation Agent in the real console.</p>'
+        },
+        {
+          id:'step3',
+          title:'Step 3  b7 Follow-Up',
+          body:'<p>GP and specialist appointments scheduled (mock).</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p>'
+        },
+        {
+          id:'step4',
+          title:'Step 4  b7 GP & Community Handoff',
+          body:'<p>GP summary sent (mock). Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p>'
+        },
+        {
+          id:'step5',
+          title:'Step 5  b7 Monitoring',
+          body:`<p>Day 1–30 avatar check-ins configured (mock). High-risk patients like ${p.name} would receive tighter monitoring.</p>`
+        },
+        {
+          id:'step6',
+          title:'Step 6  b7 Outcomes',
+          body:'<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p>'
+        }
+      ];
+
+      stepsEl.innerHTML = '';
+      steps.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<h4 style="margin:4px 0 6px;">${s.title}</h4>${s.body}`;
+        stepsEl.appendChild(card);
+      });
+    }
+
     // Patients: load from backend and populate dropdowns
     let patientsLoaded = false;
     async function loadPatients() {
@@ -1071,6 +1702,8 @@
       loadPatients();
       loadContextList();
       updateAgenticPolicyBanner();
+      renderHdPanel();
+      initPromptStudio();
       const evalCtx = document.getElementById('evalContext');
       if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
       if (evalCtx) evalCtx.addEventListener('change', () => applyEvalContext(evalCtx.value || 'discharge'));
@@ -1078,6 +1711,7 @@
     buttons.forEach(b => b.addEventListener('click', () => {
       if (b.dataset.view === 'healthAgents' && !patientsLoaded) loadPatients();
       if (b.dataset.view === 'healthAgents') updateAgenticPolicyBanner();
+      if (b.dataset.view === 'healthAgents') renderHdPanel();
       if (b.dataset.view === 'eval') {
         const evalCtx = document.getElementById('evalContext');
         if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
@@ -1238,6 +1872,8 @@
       await runHealthAgent('agenticReferral', { patient_id: pid, context: {} });
       closeModal('quickRunModal');
       focusCard('ha_card_discharge');
+      // Also surface the selected patient in the Hospital Discharge panel
+      try { selectHdPatient(pid); } catch (e) {}
     }
 
     function formatResult(kind, data) {

@@ -1,0 +1,120 @@
+agents:
+  - id: discharge_readiness_agent
+    name: Discharge Readiness & Risk Agent
+    description: Monitors inpatients and predicts discharge readiness and readmission risk 24–48 hours in advance.
+    llm_profile: large_clinical_model
+    data_sources:
+      - type: csv
+        id: emr_patient_demographics
+        path: data/EMR_PATIENT_DEMOGRAPHICS.csv
+      - type: csv
+        id: pas_admission_encounter
+        path: data/PAS_ADMISSION_ENCOUNTER.csv
+      - type: csv
+        id: emr_diagnosis
+        path: data/EMR_DIAGNOSIS.csv
+      - type: csv
+        id: risk_lace_plus
+        path: data/RISK_SCORE_LACE_PLUS.csv
+      - type: csv
+        id: risk_hospital
+        path: data/RISK_SCORE_HOSPITAL.csv
+    triggers:
+      - type: schedule
+        cron: "*/15 * * * *"   # every 15 mins
+    outputs:
+      - type: control_console_signal
+        channel: health.hospital_discharge.risk_updates
+
+  - id: medication_reconciliation_agent
+    name: Medication Reconciliation & Education Agent
+    description: Compares home, in-hospital and discharge medications, flags discrepancies and generates patient-friendly education packs.
+    llm_profile: large_clinical_model
+    data_sources:
+      - type: csv
+        id: emr_home_meds
+        path: data/EMR_HOME_MEDICATIONS.csv
+      - type: csv
+        id: emr_hospital_meds
+        path: data/EMR_MEDICATIONS.csv
+      - type: csv
+        id: emr_discharge_meds
+        path: data/EMR_DISCHARGE_MEDICATIONS.csv
+    tools:
+      - id: pdf_generator
+        type: mcp
+        endpoint: pdf-generator-mock
+    outputs:
+      - type: file
+        directory: generated/patient_education/
+      - type: control_console_signal
+        channel: health.hospital_discharge.med_recon_status
+
+  - id: followup_orchestration_agent
+    name: Follow-Up Orchestration Agent
+    description: Books and tracks post-discharge GP, specialist, pathology and allied health appointments.
+    llm_profile: medium_coordination_model
+    data_sources:
+      - type: csv
+        id: discharge_plan
+        path: data/DISCHARGE_PLAN.csv
+      - type: csv
+        id: appointments
+        path: data/FOLLOW_UP_APPOINTMENTS.csv
+    tools:
+      - id: booking_hub_mock
+        type: mcp
+        endpoint: booking-hub-mock
+    outputs:
+      - type: control_console_signal
+        channel: health.hospital_discharge.followup_status
+
+  - id: gp_community_handoff_agent
+    name: GP & Community Handoff Agent
+    description: Generates discharge summaries and sends structured handoff to GP and community services.
+    llm_profile: large_clinical_model
+    data_sources:
+      - type: csv
+        id: ehr_gp_info
+        path: data/EHR_GP_INFORMATION.csv
+      - type: csv
+        id: community_directory
+        path: data/COMMUNITY_SERVICES_DIRECTORY.csv
+    tools:
+      - id: secure_messaging_mock
+        type: mcp
+        endpoint: secure-messaging-mock
+    outputs:
+      - type: control_console_signal
+        channel: health.hospital_discharge.handoff_status
+
+  - id: post_discharge_monitoring_agent
+    name: Post-Discharge Monitoring Agent
+    description: Runs Day 1–30 check-ins, monitors adherence and triggers early intervention.
+    llm_profile: medium_conversational_model
+    data_sources:
+      - type: csv
+        id: monitoring_protocols
+        path: data/POST_DISCHARGE_PROTOCOLS.csv
+      - type: csv
+        id: monitoring_events
+        path: data/POST_DISCHARGE_EVENTS.csv
+    tools:
+      - id: avatar_channel_mock
+        type: mcp
+        endpoint: avatar-messaging-mock
+    outputs:
+      - type: control_console_signal
+        channel: health.hospital_discharge.monitoring_status
+
+  - id: discharge_outcomes_analytics_agent
+    name: Outcomes & Governance Analytics Agent
+    description: Aggregates readmission, adherence and follow-up completion KPIs for clinical governance dashboards.
+    llm_profile: small_analytics_model
+    data_sources:
+      - type: csv
+        id: outcome_metrics
+        path: data/OUTCOME_METRICS.csv
+    outputs:
+      - type: control_console_signal
+        channel: health.hospital_discharge.kpi_updates

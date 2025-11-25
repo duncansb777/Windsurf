@@ -1,0 +1,3 @@
+GP_ID,GP_NAME,ORGANIZATION_ID,PHONE,EMAIL,ADDRESS_LINE,SUBURB,STATE,POSTCODE
+GP0001,Dr Alice Roberts,org-001,08 8100 1111,alice.roberts@gpclinic.example,10 High St,Adelaide,SA,5000
+GP0002,Dr Ben Singh,org-002,08 8200 2222,ben.singh@gppractice.example,25 Main Rd,Prospect,SA,5082

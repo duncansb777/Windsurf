@@ -1,0 +1,4 @@
+SERVICE_ID,SERVICE_NAME,SERVICE_TYPE,PHONE,EMAIL,REGION,NOTES
+CS0001,Community Heart Failure Nurse,Hospital@Home,08 8300 1000,hf-nurse@community.example,Metro North,Home visits for HF within 48h of discharge
+CS0002,Respiratory Outreach Team,Hospital@Home,08 8300 2000,resp-outreach@community.example,Metro West,COPD support and education
+CS0003,NDIS Support Coordinator,NDIS,08 8300 3000,ndis-support@example,Statewide,Coordination of NDIS supports post-discharge
