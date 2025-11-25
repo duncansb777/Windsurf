@@ -211,53 +211,58 @@
 
       <div class="card">
         <h3>Health Agents</h3>
+        <p style="color:var(--muted); margin-top:-4px; font-size:12px;">Hospital Discharge bundle (6 agents) orchestrated through the Health screen.</p>
         <table>
           <thead>
-            <tr><th>Agent</th><th>Status</th><th>Autonomy</th><th>Current Tasks</th><th></th></tr>
+            <tr><th>Agent / Step</th><th>Status</th><th>Risk Focus</th><th></th></tr>
           </thead>
           <tbody>
             <tr>
-              <td>Patient Discharge Trigger</td>
+              <td>Discharge Readiness &amp; Risk</td>
               <td><span class="pill ok">Healthy</span></td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">2</td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')"><span id="fleet_health_discharge_tasks"></span>12</span></td>
+              <td>Risk banding (LACE+ / HOSPITAL)</td>
               <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">View</button>
-                <button class="btn" onclick="openQuickRun()">Run</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_discharge')">Open Link</button>
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
               </td>
             </tr>
             <tr>
-              <td>Agentic Referral (LLM plan)</td>
+              <td>Medication Reconciliation &amp; Education</td>
               <td><span class="pill ok">Healthy</span></td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">2</td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')"><span id="fleet_health_agentic_tasks">4</span></td>
+              <td>High-risk meds &amp; education</td>
               <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">View</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">Run</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_agentic')">Open Link</button>
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
               </td>
             </tr>
             <tr>
-              <td>Consent Check</td>
+              <td>Follow-Up Orchestration</td>
               <td><span class="pill ok">Healthy</span></td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">2</td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_consent')"><span id="fleet_health_consent_tasks">7</span></td>
+              <td>GP &amp; specialist follow-up</td>
               <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">View</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">Run</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_consent')">Open Link</button>
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
               </td>
             </tr>
             <tr>
-              <td>Travel (Uber Booking)</td>
+              <td>GP &amp; Community Handoff</td>
               <td><span class="pill ok">Healthy</span></td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">2</td>
-              <td class="link-cell" onclick="goToView('healthAgents'); focusCard('ha_card_travel')"><span id="fleet_health_travel_tasks">3</span></td>
+              <td>GP summary + community services</td>
               <td class="row" style="gap:6px;">
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">View</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">Run</button>
-                <button class="btn" onclick="goToView('healthAgents'); focusCard('ha_card_travel')">Open Link</button>
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Post-Discharge Monitoring</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td>Avatar check-ins &amp; alerts</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Outcomes &amp; Learning</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td>Readmission &amp; LOS KPIs</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
               </td>
             </tr>
           </tbody>
@@ -2720,6 +2725,10 @@ ASSISTANT:
         if (fileInput) fileInput.value = fileName;
       });
     }
+
+    // Initialise Hospital Discharge panel and Prompt Studio on load
+    try { if (typeof renderHdPanel === 'function') renderHdPanel(); } catch (e) { console.error('renderHdPanel init failed', e); }
+    try { if (typeof initPromptStudio === 'function') initPromptStudio(); } catch (e) { console.error('initPromptStudio init failed', e); }
   </script>
 </body>
 </html>
