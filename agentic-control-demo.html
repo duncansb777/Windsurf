@@ -427,6 +427,11 @@
           <div class="grid" style="grid-template-columns:1fr; gap:8px;" id="hd_step_cards"></div>
         </div>
       </div>
+      <div style="margin-top:12px;">
+        <h4 style="margin:4px 0 6px;">LLM Decision Logic (Demo)</h4>
+        <p style="color:var(--muted); font-size:12px; margin-top:-4px;">When you run a Hospital Discharge step, this shows the reasoning the (mock) LLM agent used based on the CSV-backed patient and risk data.</p>
+        <div id="hd_llm_logic" style="white-space:pre-wrap; font-size:12px; color:var(--muted); padding:8px; background:#f9fafb; border-radius:8px; border:1px solid var(--border);"></div>
+      </div>
     </div>
   </section>
 
@@ -657,7 +662,7 @@
                   <thead>
                     <tr><th>Scenario</th><th>Status</th><th>Last Run</th></tr>
                   </thead>
-                  <tbody>
+                  <tbody id="packExamplesBody">
                     <tr><td>Disconnection with Active Payment Plan</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
                     <tr><td>Final Bill with Credit Balance</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
                     <tr><td>Move-In with Pending Special Read</td><td><span class="pill ok">Passed</span></td><td>Today</td></tr>
@@ -912,7 +917,14 @@
         title: 'Australian Health Privacy Regulations',
         desc: 'High-level prompts to apply Australian health privacy regulations across Health agents.',
         affects: 'All Health Agents',
-        instructions: 'Placeholder summary of APP 6/11, state Health Records Acts, and data minimisation guardrails.'
+        instructions: 'Placeholder summary of APP 6/11, state Health Records Acts, and data minimisation guardrails.',
+        policies: `- Apply Australian health privacy regulations (APP 6/11, state Health Records Acts) to all clinical and billing data.\n- Limit use and disclosure of identifiable data to the minimum necessary for care, payment or operations.\n- Do not use this environment for model training or analytics without explicit consent and governance approval.`,
+        examples: [
+          { scenario:'Use discharge data for care coordination', status:'Passed', last_run:'Today' },
+          { scenario:'Share data for model training without consent', status:'Blocked', last_run:'Today' }
+        ],
+        context_hint: 'Applies to all Health Agents as a cross-cutting privacy layer.',
+        context_preview: 'Australian Health Privacy Regulations (APP 6/11, state Health Records Acts) enforce strict limits on secondary use and disclosure of health information...'
       },
       'Patient Discharge Process': {
         domain: 'health',
@@ -933,11 +945,12 @@ Your goal is to:
 2) Estimate readmission risk using LACE+ and HOSPITAL-style factors;
 3) Recommend which discharge pathway bundle the team should use (LOW / MODERATE / HIGH risk).
 
-You must be conservative and safety-first. If data is missing or ambiguous, treat the risk as higher, not lower.
+You must:
+- Be conservative about safety.
+- Flag high-risk medicines explicitly (e.g., anticoagulants, insulin, opioids).
+- Avoid changing orders yourself – you only RECOMMEND and EXPLAIN.
 
-You are part of an Agentic Engine. Your output will be displayed in the Hospital Discharge panel of the Health screen in an Agentic Control Console.
-
-CONTEXT (from CSVs):
+CONTEXT:
 - Current inpatient encounter:
 {{encounter_context}}   # from PAS_ADMISSION_ENCOUNTER
 - Patient demographics and social factors:
@@ -952,8 +965,6 @@ CONTEXT (from CSVs):
 {{risk_scores_context}}    # from RISK_SCORE_LACE_PLUS, RISK_SCORE_HOSPITAL
 
 ASSISTANT:
-Using the context, do the following:
-
 1) Summarise in 2–3 bullet points:
    - Current clinical status relevant to discharge (stable/unstable, oxygen, mobility, cognition).
    - Key risk drivers (e.g., heart failure, COPD, polypharmacy, recent ED usage, lives alone, language barrier).
@@ -988,7 +999,14 @@ Using the context, do the following:
     "<short phrase>",
     "<short phrase>"
   ]
-}`
+}`,
+        policies: `- Be conservative and safety-first; if data is missing or ambiguous, treat risk as higher.\n- Never mark a patient READY_NOW when vital signs or labs are clearly unstable.\n- Respect privacy rules from the Australian Health Privacy Regulations pack when building context.`,
+        examples: [
+          { scenario:'High LACE+/HOSPITAL with unstable vitals', status:'Classified HIGH risk', last_run:'Today' },
+          { scenario:'Short LOS, no comorbidities, good support', status:'Classified LOW risk', last_run:'Today' }
+        ],
+        context_hint: 'Uses EMR/PAS CSVs for encounters, diagnoses, vitals, labs and risk scores to classify discharge readiness.',
+        context_preview: 'EMR_PATIENT_DEMOGRAPHICS.csv + PAS_ADMISSION_ENCOUNTER.csv + EMR_DIAGNOSIS.csv + PAS_HISTORICAL_ENCOUNTERS.csv + EMR_VITALS.csv + EMR_LAB_RESULTS.csv + optional RISK_SCORE_*.csv'
       },
       'Hospital – Medication Reconciliation Agent': {
         domain: 'health',
@@ -1057,7 +1075,14 @@ ASSISTANT:
     "<short, patient-friendly bullet point>",
     "<…>"
   ]
-}`
+}`,
+        policies: `- Do not modify medication orders directly; only recommend changes and explain the rationale.\n- Always flag high-risk medicines (anticoagulants, insulin, opioids) for explicit counselling.\n- Prefer simple, patient-friendly language in education points.`,
+        examples: [
+          { scenario:'HF patient with ACE inhibitor dose reduction', status:'Explains change and monitoring', last_run:'Today' },
+          { scenario:'New opioid at discharge', status:'Flags as high-risk with counselling points', last_run:'Today' }
+        ],
+        context_hint: 'Compares EMR_HOME_MEDICATIONS, EMR_MEDICATIONS and EMR_DISCHARGE_MEDICATIONS plus diagnosis + medication reference.',
+        context_preview: 'HOME vs in-hospital vs discharge medicines from CSVs, with a reference table for high-risk drugs and classes.'
       },
       'Hospital – Follow-Up Orchestration Agent': {
         domain: 'health',
@@ -1112,7 +1137,14 @@ ASSISTANT:
       }
     }
   ]
-}`
+}`,
+        policies: `- Do not modify booking systems directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses EMR/PAS CSVs for discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory.',
+        context_preview: 'Discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory from CSVs.'
       },
       'Hospital – GP & Community Handoff Agent': {
         domain: 'health',
@@ -1124,7 +1156,6 @@ You are the GP & Community Handoff Agent.
 Your tasks:
 1) Summarise the hospital stay in a GP-friendly way.
 2) Highlight what the GP and community services need to do.
-3) Produce structured handoff objects that can be sent by secure messaging and logged in databases.
 
 CONTEXT:
 - Core clinical summary (diagnoses, procedures, hospital course):
@@ -1171,7 +1202,14 @@ ASSISTANT:
       "requested_followup": "<e.g. home visit within 48h>"
     }
   ]
-}`
+}`,
+        policies: `- Do not modify GP/community services directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
+        context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
       },
       'Hospital – Post-Discharge Monitoring Agent': {
         domain: 'health',
@@ -1230,7 +1268,14 @@ ASSISTANT:
       "recommended_action": "<short text>"
     }
   ]
-}`
+}`,
+        policies: `- Do not override clinicians; only propose alerts and suggested actions.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses POST_DISCHARGE_MONITORING_PLAN, AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA and risk agent output.',
+        context_preview: 'Monitoring plan, recent avatar interactions, clinical risk band from CSVs.'
       },
       'Hospital – Outcomes & Governance Analytics Agent': {
         domain: 'health',
@@ -1284,7 +1329,13 @@ ASSISTANT:
     "<insight 2>",
     "<insight 3>"
   ]
-}`
+}`,
+        policies: `- Report KPIs honestly, without hiding poor performance.\n- Break down outcomes by risk band and bundle adherence.\n- Highlight actionable trends rather than trivial correlations.`,
+        examples: [
+          { scenario:'HIGH risk patients without GP ≤7 days', status:'Flags higher readmission rate', last_run:'Today' }
+        ],
+        context_hint: 'Aggregates OUTCOME_TRACKING, PERFORMANCE_METRICS and improvement logs.',
+        context_preview: '30-day readmissions, GP follow-up, med recon completion and LOS vs baseline, sliced by risk band.'
       }
     };
 
@@ -1295,6 +1346,10 @@ ASSISTANT:
       const descEl = document.getElementById('packDesc');
       const affectsEl = document.getElementById('packAffects');
       const instrEl = document.getElementById('packInstructions');
+      const exBody = document.getElementById('packExamplesBody');
+      const polEl = document.getElementById('policyText');
+      const ctxHint = document.getElementById('ctxPackHint');
+      const ctxPrev = document.getElementById('ctxPreview');
       if (!domainSel || !packButtons.length || !titleEl || !descEl || !affectsEl || !instrEl) return;
 
       function applyDomainFilter() {
@@ -1312,6 +1367,17 @@ ASSISTANT:
         descEl.textContent = cfg.desc || descEl.textContent;
         affectsEl.textContent = cfg.affects || affectsEl.textContent;
         instrEl.value = cfg.instructions || instrEl.value;
+        if (polEl && cfg.policies) polEl.value = cfg.policies;
+        if (exBody && Array.isArray(cfg.examples)) {
+          exBody.innerHTML = '';
+          cfg.examples.forEach(ex => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${ex.scenario}</td><td><span class="pill ok">${ex.status}</span></td><td>${ex.last_run}</td>`;
+            exBody.appendChild(tr);
+          });
+        }
+        if (ctxHint && cfg.context_hint) ctxHint.textContent = cfg.context_hint;
+        if (ctxPrev && cfg.context_preview) ctxPrev.textContent = cfg.context_preview;
         packButtons.forEach(btn => {
           btn.classList.toggle('active', btn.dataset.pack === name);
         });
@@ -1542,295 +1608,9 @@ ASSISTANT:
     function hdColour(risk) {
       if (!risk) return 'pill';
       const r = risk.toUpperCase();
-      if (r === 'HIGH') return 'pill err';
-      if (r === 'MODERATE' || r === 'INTERMEDIATE') return 'pill warn';
-      return 'pill ok';
-    }
 
-    function renderHdPanel() {
-      const kpiEl = document.getElementById('hd_kpi_strip');
-      const tbody = document.getElementById('hd_inpatient_tbody');
-      const stepsEl = document.getElementById('hd_step_cards');
-      if (!kpiEl || !tbody || !stepsEl) return;
-
-      // Simple mock KPIs derived from dataset
-      const total = HD_PATIENTS.length;
-      const high = HD_PATIENTS.filter(p => p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH').length;
-      const monitored = HD_PATIENTS.filter(p => p.status.indexOf('Ready') >= 0).length;
-      const gp7d = Math.round((total - 3) / total * 100); // mock
-      const medRecon = 92; // mock
-      const readmit30 = 14; // mock
-
-      kpiEl.innerHTML = '';
-      const tiles = [
-        { label:'30-day readmission rate', value: readmit30 + '%', pill:'pill err' },
-        { label:'% with GP follow-up ≤7 days', value: gp7d + '%', pill:'pill ok' },
-        { label:'Medication reconciliation completion %', value: medRecon + '%', pill:'pill ok' },
-        { label:'High-risk discharges under active monitoring', value: monitored + ' / ' + high, pill:'pill warn' }
-      ];
-      tiles.forEach(t => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `<div style="color:var(--muted); font-weight:600;">${t.label}</div><div style="font-size:22px; font-weight:800;">${t.value}</div>`;
-        kpiEl.appendChild(card);
-      });
-
-      // Inpatient table
-      tbody.innerHTML = '';
-      HD_PATIENTS.forEach(p => {
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.dataset.patientId = p.patientId;
-        const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MOD');
-        const pillCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MOD' ? 'pill warn' : 'pill ok');
-        tr.innerHTML = `
-          <td>${p.name} <span style="display:block; font-size:11px; color:var(--muted);">${p.patientId}</span></td>
-          <td>${p.ward}</td>
-          <td>${p.lace} <span style="display:block; font-size:11px; color:var(--muted);">${p.laceRisk}</span></td>
-          <td>${p.hosp} <span style="display:block; font-size:11px; color:var(--muted);">${p.hospRisk}</span></td>
-          <td><span class="${pillCls}">${riskLabel}</span></td>
-          <td>${p.status}</td>
-        `;
-        tr.addEventListener('click', () => selectHdPatient(p.patientId));
-        tbody.appendChild(tr);
-      });
-
-      // Seed right-hand cards with first patient
-      if (HD_PATIENTS[0]) selectHdPatient(HD_PATIENTS[0].patientId);
-    }
-
-    function selectHdPatient(patientId) {
-      const p = HD_PATIENTS.find(x => x.patientId === patientId);
-      const selEl = document.getElementById('hd_selected_patient');
-      const stepsEl = document.getElementById('hd_step_cards');
-      if (!selEl || !stepsEl) return;
-      if (!p) {
-        selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
-        stepsEl.innerHTML = '';
-        return;
-      }
-      selEl.innerHTML = `<strong>${p.name}</strong> • ${p.patientId} • ${p.ward}`;
-
-      const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE');
-      const riskCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MODERATE' ? 'pill warn' : 'pill ok');
-
-      const steps = [
-        {
-          id:'step1',
-          title:'Step 1  b7 Discharge Readiness & Risk',
-          body:`<p><strong>LACE+:</strong> ${p.lace} (${p.laceRisk}) &nbsp; <strong>HOSPITAL:</strong> ${p.hosp} (${p.hospRisk})</p>
-                <p><strong>Overall risk:</strong> <span class="${riskCls}">${riskLabel}</span></p>
-                <p><strong>Flags:</strong> ${p.atsi ? 'ATSI; ' : ''}${p.ndis ? 'NDIS participant; ' : ''}${(!p.atsi && !p.ndis) ? 'None recorded.' : ''}</p>`
-        },
-        {
-          id:'step2',
-          title:'Step 2  b7 Med Reconciliation',
-          body:'<p>Status: <span class="pill ok">Completed (mock)</span></p><p>Discrepancies: 1–2 typical per patient. Open generated PDF pack from the Medication Reconciliation Agent in the real console.</p>'
-        },
-        {
-          id:'step3',
-          title:'Step 3  b7 Follow-Up',
-          body:'<p>GP and specialist appointments scheduled (mock).</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p>'
-        },
-        {
-          id:'step4',
-          title:'Step 4  b7 GP & Community Handoff',
-          body:'<p>GP summary sent (mock). Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p>'
-        },
-        {
-          id:'step5',
-          title:'Step 5  b7 Monitoring',
-          body:`<p>Day 1–30 avatar check-ins configured (mock). High-risk patients like ${p.name} would receive tighter monitoring.</p>`
-        },
-        {
-          id:'step6',
-          title:'Step 6  b7 Outcomes',
-          body:'<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p>'
-        }
-      ];
-
-      stepsEl.innerHTML = '';
-      steps.forEach(s => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `<h4 style="margin:4px 0 6px;">${s.title}</h4>${s.body}`;
-        stepsEl.appendChild(card);
-      });
-    }
-
-    // Patients: load from backend and populate dropdowns
-    let patientsLoaded = false;
-    async function loadPatients() {
-      try {
-        const res = await fetch((HEALTH_API.baseUrl || '') + '/patients');
-        const data = await res.json().catch(() => ({}));
-        const patients = (data && data.patients) || [];
-        const options = patients.map(p => ({ id: p.patient_id || p.mrn || p.ihi || '', label: (p.name || p.patient_id || '').toString() }));
-        const selectIds = ['ha_patient_sel','ha_patient_agentic_sel','ha_patient_con_sel','ha_patient_travel_sel','fleet_patient_sel'];
-        for (const sid of selectIds) {
-          const sel = document.getElementById(sid);
-          if (!sel) continue;
-          while (sel.options.length > 1) sel.remove(1);
-          for (const o of options) {
-            if (!o.id) continue;
-            const opt = document.createElement('option');
-            opt.value = o.id;
-            opt.textContent = o.label;
-            sel.appendChild(opt);
-          }
-        }
-        if (!patients.length) { /* silent: may be okay in early startup */ }
-        patientsLoaded = true;
-      } catch (e) {
-        // keep silent failure; UI can still accept typed IDs
-      }
-    }
-
-    // Sync selects into the adjacent text inputs so run buttons work without typing
-    function bindSelectSync(selId, inputId) {
-      const s = document.getElementById(selId);
-      const i = document.getElementById(inputId);
-      if (s && i) s.addEventListener('change', () => { i.value = s.value; });
-    }
-    bindSelectSync('ha_patient_sel','ha_patient');
-    bindSelectSync('ha_patient_agentic_sel','ha_patient_agentic');
-    bindSelectSync('ha_patient_con_sel','ha_patient_con');
-    bindSelectSync('ha_patient_travel_sel','ha_patient_travel');
-
-    // Load on initial page load and when opening Health Agents / Eval views
-    document.addEventListener('DOMContentLoaded', () => {
-      loadPatients();
-      loadContextList();
-      updateAgenticPolicyBanner();
-      renderHdPanel();
-      initPromptStudio();
-      const evalCtx = document.getElementById('evalContext');
-      if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
-      if (evalCtx) evalCtx.addEventListener('change', () => applyEvalContext(evalCtx.value || 'discharge'));
-    });
-    buttons.forEach(b => b.addEventListener('click', () => {
-      if (b.dataset.view === 'healthAgents' && !patientsLoaded) loadPatients();
-      if (b.dataset.view === 'healthAgents') updateAgenticPolicyBanner();
-      if (b.dataset.view === 'healthAgents') renderHdPanel();
-      if (b.dataset.view === 'eval') {
-        const evalCtx = document.getElementById('evalContext');
-        if (evalCtx) applyEvalContext(evalCtx.value || 'discharge');
-      }
-    }));
-
-    // Global policy blob for Agentic Referral, populated from Prompt Studio
-    window.__agenticReferralPolicy = window.__agenticReferralPolicy || null;
-
-    function updateAgenticPolicyBanner() {
-      const pol = window.__agenticReferralPolicy;
-      const packEl = document.getElementById('ha_policy_pack');
-      const timeEl = document.getElementById('ha_policy_time');
-      if (!packEl || !timeEl) return;
-      if (!pol) {
-        packEl.textContent = 'None submitted';
-        timeEl.textContent = '–';
-        return;
-      }
-      packEl.textContent = pol.pack || 'Custom policies';
-      try {
-        const d = pol.submitted_at ? new Date(pol.submitted_at) : null;
-        timeEl.textContent = d ? d.toLocaleString() : pol.submitted_at || '–';
-      } catch {
-        timeEl.textContent = pol.submitted_at || '–';
-      }
-    }
-
-    function submitPoliciesForAgentic() {
-      const txt = document.getElementById('policyText');
-      const titleEl = document.getElementById('packTitle');
-      const packName = titleEl ? titleEl.textContent : '';
-      if (!txt) {
-        showToast('No policy textarea found');
-        return;
-      }
-      window.__agenticReferralPolicy = {
-        pack: packName,
-        policies_markdown: txt.value || '',
-        submitted_at: new Date().toISOString(),
-      };
-      showToast('Policies submitted for Agentic Referral (will apply on next run)');
-      updateAgenticPolicyBanner();
-    }
-
-    // Health Agents execution direct to backend
-    async function runHealthAgent(kind, payload) {
-      const ep = (HEALTH_API.endpoints || {})[kind];
-      if (!ep) { showToast('Unknown action: ' + kind); return; }
-      const url = (HEALTH_API.baseUrl || '') + ep;
-      const label = {
-        discharge: 'Discharge',
-        agenticReferral: 'Agentic Referral',
-        consent: 'Consent Check',
-        uber: 'Travel Booking'
-      }[kind] || kind;
-      showToast('Running ' + label + '…');
-      try {
-        // If no typed patient_id, use selected from dropdown where available
-        if (payload && !payload.patient_id) {
-          const map = {
-            discharge: 'ha_patient_sel',
-            agenticReferral: 'ha_patient_agentic_sel',
-            consent: 'ha_patient_con_sel',
-            uber: 'ha_patient_travel_sel'
-          };
-          const sid = map[kind];
-          if (sid) {
-            const selVal = sel(sid);
-            if (selVal) payload.patient_id = selVal;
-          }
-        }
-        // For Agentic Referral, attach any submitted policies into context for the backend/LLM
-        if (kind === 'agenticReferral') {
-          const pol = window.__agenticReferralPolicy;
-          const ctx = (payload && payload.context) || {};
-          if (pol) {
-            ctx.policies = pol;
-          }
-          payload.context = ctx;
-        }
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload||{})
-        });
-        const data = await res.json().catch(() => ({}));
-        writeResults(kind, data, !!window.__appendMode);
-        appendExecutionGraph(kind, payload, data);
-        window.__appendMode = false;
-        if (!res.ok) {
-          showToast(label + ' failed (HTTP ' + res.status + ')');
-        } else {
-          showToast(label + ' completed');
-          // Increment Fleet Dashboard Health Agents current task counters for the relevant agent
-          try {
-            const idMap = {
-              discharge: 'fleet_health_discharge_tasks',
-              agenticReferral: 'fleet_health_agentic_tasks',
-              consent: 'fleet_health_consent_tasks',
-              uber: 'fleet_health_travel_tasks'
-            };
-            const spanId = idMap[kind];
-            if (spanId) {
-              const el = document.getElementById(spanId);
-              if (el) {
-                const cur = parseInt((el.textContent || '0').trim(), 10);
-                el.textContent = String(isNaN(cur) ? 1 : cur + 1);
-              }
-            }
-          } catch (e) {}
-        }
-      } catch (e) {
-        writeResults(kind, { error: String(e) }, !!window.__appendMode);
-        window.__appendMode = false;
-        showToast('Request error for ' + label);
-      }
-    }
-
+  runHealthAgent(kind, payload);
+}
     function writeResults(kind, data, append) {
       const jsonEl = document.getElementById('ha_result_json');
       const textEl = document.getElementById('ha_result_text');
