@@ -528,17 +528,30 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
 
         # If the model did not propose any follow-ups but risk/diagnosis context
         # suggests a need for mental health follow-up, synthesise one so the
-        # downstream execution and narrative remain meaningful.
+        # downstream execution and narrative remain meaningful. For clearly
+        # low-risk patients, respect the LLM decision that no additional
+        # specialist follow-up is required.
         if not required_followups:
             try:
                 csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
                 diag_rows = csv_ctx.get("diagnosis") or []
                 risk_lace = csv_ctx.get("risk_lace_plus") or []
+
+                # Treat as high risk only when the risk band/category explicitly
+                # indicates HIGH, not merely because a row exists.
                 high_risk = False
-                if risk_lace:
-                    # Any non-empty row here is treated as elevated risk for demo
-                    high_risk = True
-                mh_diag = any("depress" in (r.get("DESCRIPTION", "").lower()) or "suicid" in (r.get("DESCRIPTION", "").lower()) for r in diag_rows)
+                for r in risk_lace:
+                    band = (r.get("RISK_BAND") or r.get("RISK_CATEGORY") or r.get("RISK_LEVEL") or "").upper()
+                    if "HIGH" in band:
+                        high_risk = True
+                        break
+
+                mh_diag = any(
+                    "depress" in (r.get("DESCRIPTION", "").lower())
+                    or "suicid" in (r.get("DESCRIPTION", "").lower())
+                    for r in diag_rows
+                )
+
                 if high_risk or mh_diag:
                     required_followups = [
                         {
@@ -553,6 +566,42 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
                     plan["required_followups"] = required_followups
             except Exception:
                 pass
+
+        # Ensure that every patient has at least one GP follow-up appointment
+        # scheduled with their relevant GP. If the LLM (or the above mental
+        # health fallback) did not include a GP-type follow-up, derive one from
+        # GP EMR context so that a GP appointment is always booked.
+        try:
+            has_gp_followup = any(
+                isinstance(f.get("type"), str)
+                and "gp" in f["type"].lower()
+                for f in required_followups
+            )
+            if not has_gp_followup:
+                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+                gp_rows = csv_ctx.get("gp_information") or []
+                gp_name = None
+                if gp_rows:
+                    g0 = gp_rows[0]
+                    gp_name = g0.get("GP_NAME") or None
+
+                label = "GP follow-up appointment"
+                if gp_name:
+                    label = f"GP follow-up with {gp_name}"
+
+                gp_follow = {
+                    "type": "GP follow-up",
+                    "reason": "Routine post-discharge GP review.",
+                    "recommended_timeframe": "within 7 days",
+                    "status": "MISSING",
+                    "channel": "in-person or telehealth",
+                    "priority": "medium",
+                    "description": label,
+                }
+                required_followups.append(gp_follow)
+                plan["required_followups"] = required_followups
+        except Exception:
+            pass
 
         # For any follow-ups the LLM marks as MISSING, create a Task via Epic MCP
         for fup in required_followups:
