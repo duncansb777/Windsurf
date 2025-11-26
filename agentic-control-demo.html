@@ -2053,10 +2053,37 @@ ASSISTANT:
                     `It will continue <strong>${cont}</strong> medicine(s), start <strong>${started}</strong>, and stop <strong>${stopped}</strong>, highlighting important education points for the patient.`;
           } else if (kind === 'hd_step3') {
             const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
-            const missing = fups.filter(f => f.status === 'MISSING').length;
-            const scheduled = fups.filter(f => f.status === 'ALREADY_SCHEDULED').length;
+            let missing = fups.filter(f => f.status === 'MISSING').length;
+            let scheduled = fups.filter(f => f.status === 'ALREADY_SCHEDULED').length;
+
+            // If the structured follow-up list is empty but the raw plan contains
+            // appointments, treat those as already scheduled.
+            let extraDetail = '';
+            try {
+              const raw = res.plan_raw || {};
+              const appts = raw.follow_up_plan && Array.isArray(raw.follow_up_plan.appointments)
+                ? raw.follow_up_plan.appointments
+                : [];
+              if (!fups.length && appts.length) {
+                scheduled = appts.length;
+                missing = 0;
+                const first = appts[0] || {};
+                const t = first.type || 'follow-up appointment';
+                const d = first.date || '';
+                const prov = first.provider || '';
+                const bits = [];
+                if (t) bits.push(t);
+                if (prov) bits.push(`with ${prov}`);
+                if (d) bits.push(`on ${d}`);
+                if (bits.length) {
+                  extraDetail = ` The current plan includes ${bits.join(' ')}.`;
+                }
+              }
+            } catch (e) {}
+
             intro = `The Follow-Up Orchestration agent has reviewed which appointments <code>${pid}</code> needs after discharge. ` +
-                    `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.`;
+                    `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.` +
+                    extraDetail;
           } else if (kind === 'hd_step4') {
             const gp = res.gp_handoff || {};
             const bullets = Array.isArray(gp.summary_bullets) ? gp.summary_bullets.length : 0;

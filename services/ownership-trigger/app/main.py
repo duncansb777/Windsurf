@@ -159,10 +159,65 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         # Keep context best-effort; UI should still work if MCP mock is offline
         pass
 
+    # Also surface core EMR CSV slices so every step can see the same
+    # underlying mock EMR snapshot for the selected patient.
+    try:
+        csv_ctx: dict = {}
+        csv_dir = os.path.join(BASE_DIR, "data", "csv")
+
+        def _load_csv(name: str, patient_key: str = "PATIENT_ID") -> list[dict]:
+            rows: list[dict] = []
+            path = os.path.join(csv_dir, name)
+            if not os.path.exists(path):
+                return rows
+            fieldnames = None
+            with open(path, newline="") as f:
+                rdr = csv.DictReader(f)
+                fieldnames = rdr.fieldnames or []
+                for r in rdr:
+                    if r.get(patient_key) == pid:
+                        rows.append(r)
+            # If there is no real row for this patient, synthesise a stub so
+            # that all patients have at least one entry per core CSV.
+            if not rows and fieldnames:
+                stub = {k: "" for k in fieldnames}
+                stub[patient_key] = pid
+                rows.append(stub)
+            return rows
+
+        csv_ctx["gp_information"] = _load_csv("EHR_GP_INFORMATION.csv")
+        csv_ctx["discharge_meds"] = _load_csv("EMR_DISCHARGE_MEDICATIONS.csv")
+        csv_ctx["inpatient_meds"] = _load_csv("EMR_MEDICATIONS.csv")
+        csv_ctx["home_meds"] = _load_csv("EMR_HOME_MEDICATIONS.csv")
+        csv_ctx["diagnosis"] = _load_csv("EMR_DIAGNOSIS.csv")
+        csv_ctx["admission_encounter"] = _load_csv("PAS_ADMISSION_ENCOUNTER.csv")
+        csv_ctx["risk_hospital"] = _load_csv("RISK_SCORE_HOSPITAL.csv")
+        csv_ctx["risk_lace_plus"] = _load_csv("RISK_SCORE_LACE_PLUS.csv")
+        csv_ctx["demographics"] = _load_csv("EMR_PATIENT_DEMOGRAPHICS.csv")
+
+        mcp_context["csv"] = csv_ctx
+    except Exception:
+        # Best-effort only; if any CSVs are missing the step still runs on MCP mocks
+        pass
+
     try:
         # Step-specific mock MCP data
         if step == "step2":  # medication reconciliation
             mcp_context["home_meds"] = epic.call("epic.search", {"resource_type": "MedicationRequest", "patient_id": pid})
+            # Also surface CSV-backed meds so the LLM always sees medications
+            # for demo patients like P0001/2/5 even if the Epic fixtures differ.
+            try:
+                meds_path = os.path.join(BASE_DIR, "data", "csv", "EMR_Medications.csv")
+                rows: list[dict] = []
+                with open(meds_path, newline="") as f:
+                    rdr = csv.DictReader(f)
+                    for r in rdr:
+                        if r.get("PATIENT_ID") == pid:
+                            rows.append(r)
+                mcp_context["home_meds_csv"] = rows
+            except Exception:
+                # Best-effort: if CSV missing or unreadable, continue with mock data only
+                pass
         elif step == "step3":  # follow-up orchestration
             mcp_context["followup_observations"] = epic.call("epic.search", {"resource_type": "Observation", "patient_id": pid})
         elif step == "step4":  # GP & community handoff
@@ -387,6 +442,172 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
                 "Missing follow-ups were converted into Task create operations via Epic MCP.",
             ],
             "plan_raw": plan,
+        }
+        return data
+
+    # Step 4 (GP & community handoff) uses a schema so we reliably capture
+    # a GP summary and structured action items for downstream display.
+    if step == "step4":
+        handoff_schema = {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": ["string", "null"]},
+                "agent": {"type": ["string", "null"]},
+                "gp_handoff": {
+                    "type": "object",
+                    "properties": {
+                        "summary_bullets": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "gp_action_items": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                        },
+                        "community_referrals": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                        },
+                    },
+                    "required": ["summary_bullets", "gp_action_items"],
+                    "additionalProperties": True,
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["gp_handoff"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=handoff_schema)
+        body = out.get("json") or {}
+        if not body:
+            body = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        gp = body.get("gp_handoff") or {}
+        data = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "gp_community_handoff",
+            "gp_handoff": {
+                "summary_bullets": gp.get("summary_bullets") or [],
+                "gp_action_items": gp.get("gp_action_items") or [],
+                "community_referrals": gp.get("community_referrals") or [],
+            },
+            "llm_reasoning": body.get("llm_reasoning")
+            or [
+                "GP and community handoff summary was derived from discharge, risk, and MCP provider context.",
+            ],
+            "plan_raw": body,
+        }
+        return data
+
+    # Step 5 (post-discharge monitoring) uses a schema to describe the next
+    # check-in channel, timing, and tailored questions.
+    if step == "step5":
+        monitoring_schema = {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": ["string", "null"]},
+                "agent": {"type": ["string", "null"]},
+                "next_check_in": {
+                    "type": "object",
+                    "properties": {
+                        "channel": {"type": "string"},
+                        "scheduled_time": {"type": "string"},
+                        "questions": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "alert_rules": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["channel", "questions"],
+                    "additionalProperties": True,
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["next_check_in"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=monitoring_schema)
+        body = out.get("json") or {}
+        if not body:
+            body = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        nci = body.get("next_check_in") or {}
+        data = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "post_discharge_monitoring",
+            "next_check_in": {
+                "channel": nci.get("channel"),
+                "scheduled_time": nci.get("scheduled_time"),
+                "questions": nci.get("questions") or [],
+                "alert_rules": nci.get("alert_rules") or [],
+            },
+            "llm_reasoning": body.get("llm_reasoning")
+            or [
+                "Post-discharge monitoring plan was tailored to the patient's risk level and recent discharge context.",
+            ],
+            "plan_raw": body,
+        }
+        return data
+
+    # Step 6 (outcomes & governance) uses a schema for cohort KPIs and period.
+    if step == "step6":
+        outcomes_schema = {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": ["string", "null"]},
+                "agent": {"type": ["string", "null"]},
+                "dashboard_period": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {"type": "string"},
+                        "end_date": {"type": "string"},
+                    },
+                    "required": ["start_date"],
+                    "additionalProperties": True,
+                },
+                "kpis": {
+                    "type": "object",
+                    "additionalProperties": True,
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["dashboard_period", "kpis"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=outcomes_schema)
+        body = out.get("json") or {}
+        if not body:
+            body = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        period = body.get("dashboard_period") or {}
+        data = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "outcomes_analytics",
+            "dashboard_period": {
+                "start_date": period.get("start_date"),
+                "end_date": period.get("end_date"),
+            },
+            "kpis": body.get("kpis") or {},
+            "llm_reasoning": body.get("llm_reasoning")
+            or [
+                "Outcomes and governance KPIs were summarised for this discharge program and cohort.",
+            ],
+            "plan_raw": body,
         }
         return data
 
