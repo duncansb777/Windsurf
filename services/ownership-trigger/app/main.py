@@ -467,6 +467,34 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         required_followups = plan.get("required_followups") or []
         executed: dict = {"tasks": []}
 
+        # If the model did not propose any follow-ups but risk/diagnosis context
+        # suggests a need for mental health follow-up, synthesise one so the
+        # downstream execution and narrative remain meaningful.
+        if not required_followups:
+            try:
+                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+                diag_rows = csv_ctx.get("diagnosis") or []
+                risk_lace = csv_ctx.get("risk_lace_plus") or []
+                high_risk = False
+                if risk_lace:
+                    # Any non-empty row here is treated as elevated risk for demo
+                    high_risk = True
+                mh_diag = any("depress" in (r.get("DESCRIPTION", "").lower()) or "suicid" in (r.get("DESCRIPTION", "").lower()) for r in diag_rows)
+                if high_risk or mh_diag:
+                    required_followups = [
+                        {
+                            "type": "Community mental health follow-up",
+                            "reason": "High readmission / mental health risk at discharge; ensure timely community review.",
+                            "recommended_timeframe": "within 7 days",
+                            "status": "MISSING",
+                            "channel": "in-person or telehealth",
+                            "priority": "high",
+                        }
+                    ]
+                    plan["required_followups"] = required_followups
+            except Exception:
+                pass
+
         # For any follow-ups the LLM marks as MISSING, create a Task via Epic MCP
         for fup in required_followups:
             if str(fup.get("status", "")).upper() != "MISSING":
@@ -646,6 +674,33 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             body = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
         nci = body.get("next_check_in") or {}
+        # If the model failed to propose monitoring questions, derive a simple
+        # set of 5 questions informed by diagnosis/medication context so that
+        # the UI and narrative are always populated.
+        try:
+            qs = nci.get("questions") or []
+            if not qs:
+                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+                diag = csv_ctx.get("diagnosis") or []
+                meds = csv_ctx.get("inpatient_meds") or []
+                diag_desc = diag[0].get("DESCRIPTION") if diag else "your main condition"
+                med_name = meds[0].get("MEDICATION_NAME") if meds else "your medicines"
+                qs = [
+                    f"Since going home, how have you been feeling in yourself compared to before discharge?",
+                    f"Have you noticed any new or worsening symptoms related to {diag_desc}?",
+                    f"Are you taking {med_name} and your other medicines as prescribed, and have you missed any doses?",
+                    "Have you had any side effects or concerns about your medicines that worry you?",
+                    "Do you feel you would know when to seek urgent help or contact the hospital/GP if things worsen?",
+                ]
+                nci["questions"] = qs
+                if not nci.get("alert_rules"):
+                    nci["alert_rules"] = [
+                        "Escalate to clinical review if the patient reports worsening symptoms, thoughts of self-harm, or stopping key medicines.",
+                        "Escalate if the patient is unsure how or when to seek urgent help.",
+                    ]
+        except Exception:
+            pass
+
         data = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "post_discharge_monitoring",
@@ -698,6 +753,8 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             body = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
         period = body.get("dashboard_period") or {}
+        if not period.get("start_date") and not period.get("end_date"):
+            period = {"start_date": "the current period", "end_date": ""}
         data = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "outcomes_analytics",

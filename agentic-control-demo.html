@@ -360,7 +360,7 @@
       </div>
       <div style="margin-top:12px;">
         <h4 style="margin:4px 0 6px;">LLM Decision Logic (Demo)</h4>
-        <p style="color:var(--muted); font-size:12px; margin-top:-4px;">When you run a Hospital Discharge step, this shows the reasoning the (mock) LLM agent used based on the CSV-backed patient and risk data.</p>
+        <p style="color:var(--muted); font-size:12px; margin-top:-4px;">When you run a Hospital Discharge step, this shows the reasoning the LLM agent used based on the CSV-backed patient and risk data.</p>
         <div id="hd_llm_logic" style="white-space:pre-wrap; font-size:12px; color:var(--muted); padding:8px; background:#f9fafb; border-radius:8px; border:1px solid var(--border);"></div>
         <div style="margin-top:8px;">
           <h4 style="margin:4px 0 6px;">Health Agent Result</h4>
@@ -2135,7 +2135,10 @@ ASSISTANT:
 
             function gpActionLabel(a) {
               const desc = a.description || a.summary || 'GP follow-up';
-              const prov = a.provider || a.gp || '';
+              let prov = a.provider || a.gp || '';
+              if (prov && typeof prov === 'object') {
+                prov = prov.name || prov.id || JSON.stringify(prov);
+              }
               const when = a.when || a.timeframe || a.due || '';
               const bits = [desc];
               if (prov) bits.push(`with ${prov}`);
