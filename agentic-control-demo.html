@@ -1832,10 +1832,18 @@ ASSISTANT:
       const promptCtx = {
         pack: autoPackName,
         domain: (packCfg && packCfg.domain) || baseCtx.domain || 'health',
-        // Prefer any live Prompt Studio edits; otherwise fall back to the
-        // default instructions/policies defined for this pack.
-        instructions: (baseCtx.instructions && baseCtx.instructions.trim()) || (packCfg && packCfg.instructions) || '',
-        policies_markdown: (baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) || (packCfg && packCfg.policies) || ''
+        // Prefer live Prompt Studio edits only when they correspond to the
+        // same pack; otherwise use the default instructions/policies for the
+        // auto-selected health pack so each step runs correctly without
+        // manual pack selection/submission.
+        instructions:
+          (baseCtx.pack === autoPackName && baseCtx.instructions && baseCtx.instructions.trim()) ||
+          (packCfg && packCfg.instructions) ||
+          '',
+        policies_markdown:
+          (baseCtx.pack === autoPackName && baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) ||
+          (packCfg && packCfg.policies) ||
+          ''
       };
 
       const basePayload = {
