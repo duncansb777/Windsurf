@@ -215,14 +215,86 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         json.dumps(ctx, indent=2)
     )
 
-    # Ask for free-form JSON; LLMClient will call OpenAI when configured
+    # Step 3 (follow-up orchestration) uses a structured JSON schema so we
+    # can both display the plan and execute it via Epic MCP tools.
+    if step == "step3":
+        followup_schema = {
+            "type": "object",
+            "properties": {
+                "required_followups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string"},
+                            "reason": {"type": "string"},
+                            "recommended_timeframe": {"type": "string"},
+                            "status": {"type": "string"},  # e.g. ALREADY_SCHEDULED or MISSING
+                            "channel": {"type": "string"},
+                            "priority": {"type": "string"},
+                        },
+                        "required": ["type", "recommended_timeframe", "status"],
+                        "additionalProperties": True,
+                    },
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["required_followups"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=followup_schema)
+        plan = out.get("json") or {}
+        if not plan:
+            # Fallback if schema-based parsing failed
+            plan = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        required_followups = plan.get("required_followups") or []
+        executed: dict = {"tasks": []}
+
+        # For any follow-ups the LLM marks as MISSING, create a Task via Epic MCP
+        for fup in required_followups:
+            if str(fup.get("status", "")).upper() != "MISSING":
+                continue
+            desc = fup.get("reason") or f"Follow-up: {fup.get('type','appointment')}"
+            task_res = epic.call(
+                "epic.fhir_write_back.create",
+                {
+                    "resource_type": "Task",
+                    "resource_json": {
+                        "resourceType": "Task",
+                        "status": "requested",
+                        "intent": "order",
+                        "for": {"reference": f"Patient/{pid}"},
+                        "description": desc,
+                    },
+                },
+            )
+            executed["tasks"].append({"input": fup, "result": task_res})
+
+        data: dict = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "followup_orchestration",
+            "required_followups": required_followups,
+            "executed": executed,
+            "llm_reasoning": plan.get("llm_reasoning")
+            or [
+                "Follow-up requirements were derived from discharge, risk, and MCP context.",
+                "Missing follow-ups were converted into Task create operations via Epic MCP.",
+            ],
+            "plan_raw": plan,
+        }
+        return data
+
+    # Default behaviour for other steps: free-form JSON response
     out = client.complete(system=system, user=user, tools=None, schema=None)
     data = out.get("json") or {}
     if not data:
-        # If we didn't get JSON back, fall back to embedding the text result
         data = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
-    # Ensure some minimum fields so the UI can always render
     if "llm_reasoning" not in data:
         data["llm_reasoning"] = [
             f"LLM decision for {step} based on provided discharge, risk, and policy context."
