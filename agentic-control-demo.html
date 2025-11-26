@@ -2046,56 +2046,133 @@ ASSISTANT:
                     (bundle ? ` and recommends the <strong>${bundle}</strong> discharge bundle.` : '.');
           } else if (kind === 'hd_step2') {
             const recon = res.reconciliation || {};
-            const cont = (recon.continued || []).length;
-            const started = (recon.started || []).length;
-            const stopped = (recon.stopped || []).length;
+            const contArr = Array.isArray(recon.continued) ? recon.continued : [];
+            const startedArr = Array.isArray(recon.started) ? recon.started : [];
+            const stoppedArr = Array.isArray(recon.stopped) ? recon.stopped : [];
+            const cont = contArr.length;
+            const started = startedArr.length;
+            const stopped = stoppedArr.length;
+
+            function medLabel(m) {
+              const name = m.medication_name || m.name || 'Medication';
+              const dose = m.dose || '';
+              const route = m.route || '';
+              const freq = m.frequency || '';
+              const bits = [name];
+              if (dose) bits.push(dose);
+              if (route) bits.push(route);
+              if (freq) bits.push(freq);
+              return bits.join(' · ');
+            }
+
+            const contList = contArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            const startedList = startedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            const stoppedList = stoppedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+
             intro = `The Medication Reconciliation agent has compared home, in-hospital, and proposed discharge medicines for <code>${pid}</code>. ` +
-                    `It will continue <strong>${cont}</strong> medicine(s), start <strong>${started}</strong>, and stop <strong>${stopped}</strong>, highlighting important education points for the patient.`;
+                    `It will continue <strong>${cont}</strong> medicine(s), start <strong>${started}</strong>, and stop <strong>${stopped}</strong>, highlighting important education points for the patient.` +
+                    (contList ? `<p><strong>Continued medicines:</strong><br/>${contList}</p>` : '') +
+                    (startedList ? `<p><strong>New medicines to start:</strong><br/>${startedList}</p>` : '') +
+                    (stoppedList ? `<p><strong>Medicines to stop:</strong><br/>${stoppedList}</p>` : '');
           } else if (kind === 'hd_step3') {
             const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
             let missing = fups.filter(f => f.status === 'MISSING').length;
             let scheduled = fups.filter(f => f.status === 'ALREADY_SCHEDULED').length;
 
+            const raw = res.plan_raw || {};
+            const appts = raw.follow_up_plan && Array.isArray(raw.follow_up_plan.appointments)
+              ? raw.follow_up_plan.appointments
+              : [];
+
             // If the structured follow-up list is empty but the raw plan contains
             // appointments, treat those as already scheduled.
-            let extraDetail = '';
+            if (!fups.length && appts.length) {
+              scheduled = appts.length;
+              missing = 0;
+            }
+
+            const allAppts = fups.length
+              ? fups.map(a => ({
+                  type: a.type || 'follow-up appointment',
+                  status: a.status || '',
+                  timeframe: a.recommended_timeframe || '',
+                  channel: a.channel || '',
+                }))
+              : appts.map(a => ({
+                  type: a.type || 'follow-up appointment',
+                  status: a.status || 'ALREADY_SCHEDULED',
+                  timeframe: a.date || '',
+                  channel: a.channel || '',
+                }));
+
+            const apptLines = allAppts.map(a => {
+              const bits = [a.type];
+              if (a.timeframe) bits.push(a.timeframe);
+              if (a.channel) bits.push(a.channel);
+              if (a.status) bits.push(`status: ${a.status}`);
+              return `• ${bits.join(' · ')}`;
+            }).join('<br/>');
+
+            let safetyLine = '';
             try {
-              const raw = res.plan_raw || {};
-              const appts = raw.follow_up_plan && Array.isArray(raw.follow_up_plan.appointments)
-                ? raw.follow_up_plan.appointments
-                : [];
-              if (!fups.length && appts.length) {
-                scheduled = appts.length;
-                missing = 0;
-                const first = appts[0] || {};
-                const t = first.type || 'follow-up appointment';
-                const d = first.date || '';
-                const prov = first.provider || '';
-                const bits = [];
-                if (t) bits.push(t);
-                if (prov) bits.push(`with ${prov}`);
-                if (d) bits.push(`on ${d}`);
-                if (bits.length) {
-                  extraDetail = ` The current plan includes ${bits.join(' ')}.`;
-                }
+              const sp = raw.follow_up_plan && raw.follow_up_plan.safety_plan;
+              const ra = raw.risk_assessment || {};
+              const spStatus = ra.safety_plan_status || (typeof sp === 'string' ? sp : '');
+              if (spStatus) {
+                safetyLine = `<p><strong>Safety plan status:</strong> ${spStatus}</p>`;
               }
             } catch (e) {}
 
             intro = `The Follow-Up Orchestration agent has reviewed which appointments <code>${pid}</code> needs after discharge. ` +
                     `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.` +
-                    extraDetail;
+                    (apptLines ? `<p><strong>Follow-up appointments:</strong><br/>${apptLines}</p>` : '') +
+                    safetyLine;
           } else if (kind === 'hd_step4') {
             const gp = res.gp_handoff || {};
             const bullets = Array.isArray(gp.summary_bullets) ? gp.summary_bullets.length : 0;
-            const actions = Array.isArray(gp.gp_action_items) ? gp.gp_action_items.length : 0;
+            const actionsArr = Array.isArray(gp.gp_action_items) ? gp.gp_action_items : [];
+            const referralsArr = Array.isArray(gp.community_referrals) ? gp.community_referrals : [];
+
+            function gpActionLabel(a) {
+              const desc = a.description || a.summary || 'GP follow-up';
+              const prov = a.provider || a.gp || '';
+              const when = a.when || a.timeframe || a.due || '';
+              const bits = [desc];
+              if (prov) bits.push(`with ${prov}`);
+              if (when) bits.push(when);
+              return bits.join(' · ');
+            }
+
+            const gpLines = actionsArr.map(a => `• ${gpActionLabel(a)}`).join('<br/>');
+            const refLines = referralsArr.map(r => {
+              const type = r.type || r.service || 'Referral';
+              const dest = r.to || r.organization || '';
+              const when = r.when || r.timeframe || '';
+              const bits = [type];
+              if (dest) bits.push(`to ${dest}`);
+              if (when) bits.push(when);
+              return `• ${bits.join(' · ')}`;
+            }).join('<br/>');
+
+            const actions = actionsArr.length;
             intro = `The GP & Community Handoff agent has generated a structured handover for patient <code>${pid}</code>. ` +
-                    `It includes <strong>${bullets}</strong> key summary point(s) and <strong>${actions}</strong> action item(s) for the GP and community services.`;
+                    `It includes <strong>${bullets}</strong> key summary point(s) and <strong>${actions}</strong> GP action item(s), plus any required community referrals.` +
+                    (gpLines ? `<p><strong>GP follow-up actions:</strong><br/>${gpLines}</p>` : '') +
+                    (refLines ? `<p><strong>Community referrals:</strong><br/>${refLines}</p>` : '');
           } else if (kind === 'hd_step5') {
             const nc = res.next_check_in || {};
             const ch = nc.channel || 'APP';
-            const qs = Array.isArray(nc.questions) ? nc.questions.length : 0;
+            const qsArr = Array.isArray(nc.questions) ? nc.questions : [];
+            const qs = qsArr.length;
+            const alertArr = Array.isArray(nc.alert_rules) ? nc.alert_rules : [];
+
+            const qLines = qsArr.map(q => `• ${q}`).join('<br/>');
+            const alertLines = alertArr.map(a => `• ${a}`).join('<br/>');
+
             intro = `The Post-Discharge Monitoring agent has planned the next check-in for <code>${pid}</code>. ` +
-                    `It proposes a <strong>${ch}</strong> check-in with <strong>${qs}</strong> tailored question(s) and will raise alerts if concerning responses appear.`;
+                    `It proposes a <strong>${ch}</strong> check-in with <strong>${qs}</strong> tailored question(s) and will raise alerts if concerning responses appear.` +
+                    (qLines ? `<p><strong>Monitoring questions:</strong><br/>${qLines}</p>` : '') +
+                    (alertLines ? `<p><strong>Escalation rules:</strong><br/>${alertLines}</p>` : '');
           } else if (kind === 'hd_step6') {
             const period = res.dashboard_period || {};
             const start = period.start_date || 'the current period';
@@ -2104,9 +2181,7 @@ ASSISTANT:
                     `It summarises readmission, follow-up completion, medication reconciliation, and length-of-stay performance for this discharge program.`;
           }
 
-          const prettyStep = (() => { try { return JSON.stringify(res, null, 2); } catch { return String(res); } })();
-          return `<p>${intro}</p><p><strong>Underlying JSON result:</strong></p>` +
-                 `<pre style="white-space:pre-wrap; background:#f9fafb; border-radius:4px; padding:6px;">${prettyStep}</pre>`;
+          return `<p>${intro}</p>`;
         }
       } catch {}
       const safe = (data !== undefined) ? data : null;

@@ -354,14 +354,51 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             body = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
         recon = body.get("reconciliation") or {}
+
+        # Normalise LLM reconciliation lists
+        cont = recon.get("continued") or []
+        started = recon.get("started") or []
+        stopped = recon.get("stopped") or []
+        edu = recon.get("education_points") or []
+
+        # If the LLM did not populate any reconciliation decisions, fall back to
+        # a simple CSV-based derivation so the demo always reflects meds
+        # explicitly listed for this patient.
+        if not (cont or started or stopped):
+            try:
+                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+                home_rows = csv_ctx.get("home_meds") or []
+
+                def _med_from_row(r: dict, source: str) -> dict:
+                    return {
+                        "source": source,
+                        "medication_name": r.get("MEDICATION_NAME") or r.get("MED_NAME") or "Medication",
+                        "dose": r.get("DOSE") or r.get("STRENGTH") or "",
+                        "route": r.get("ROUTE") or "",
+                        "frequency": r.get("FREQUENCY") or "",
+                        "status": r.get("STATUS") or "ACTIVE",
+                    }
+
+                cont = [_med_from_row(r, "home") for r in home_rows]
+
+                # Add a generic education point for any high-risk-looking meds
+                if home_rows and not edu:
+                    names = " ".join([r.get("MEDICATION_NAME", "") for r in home_rows]).lower()
+                    if any(k in names for k in ["insulin", "prednisolone", "warfarin", "opioid", "morphine"]):
+                        edu = [
+                            "Reinforce sick-day rules and hypoglycaemia/side-effect monitoring for high-risk medicines.",
+                        ]
+            except Exception:
+                pass
+
         data = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "medication_reconciliation",
             "reconciliation": {
-                "continued": recon.get("continued") or [],
-                "started": recon.get("started") or [],
-                "stopped": recon.get("stopped") or [],
-                "education_points": recon.get("education_points") or [],
+                "continued": cont,
+                "started": started,
+                "stopped": stopped,
+                "education_points": edu,
             },
             "llm_reasoning": body.get("llm_reasoning")
             or [
@@ -374,6 +411,16 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
     # Step 3 (follow-up orchestration) uses a structured JSON schema so we
     # can both display the plan and execute it via Epic MCP tools.
     if step == "step3":
+        # Strengthen instructions for safety-planned mental health follow-up.
+        system = (
+            system
+            + "\n\nFor this follow-up orchestration step, you MUST:\n"
+            "- Inspect risk, diagnosis, observation, and CSV context for suicidal ideation or mental health risk.\n"
+            "- Ensure that at least one mental-health follow-up appointment exists (e.g., community mental health).\n"
+            "- If no such appointment is already scheduled, create a required follow-up with type 'Community mental health follow-up' and status 'MISSING'.\n"
+            "- Reflect whether the patient's safety plan is completed via 'safety_plan_status'.\n"
+        )
+
         followup_schema = {
             "type": "object",
             "properties": {
@@ -396,6 +443,15 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
                 "llm_reasoning": {
                     "type": "array",
                     "items": {"type": "string"},
+                },
+                "safety_plan_status": {
+                    "type": ["string", "null"],
+                },
+                "mental_health_followup_required": {
+                    "type": ["boolean", "null"],
+                },
+                "mental_health_followup_scheduled": {
+                    "type": ["boolean", "null"],
                 },
             },
             "required": ["required_followups"],
@@ -448,6 +504,14 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
     # Step 4 (GP & community handoff) uses a schema so we reliably capture
     # a GP summary and structured action items for downstream display.
     if step == "step4":
+        system = (
+            system
+            + "\n\nFor this GP & community handoff step, you MUST:\n"
+            "- Summarise key points the GP and community team need to know.\n"
+            "- Identify whether a GP follow-up appointment is required based on risk/diagnosis.\n"
+            "- If a GP follow-up is required and no such appointment is recorded, create a GP action item describing that follow-up.\n"
+        )
+
         handoff_schema = {
             "type": "object",
             "properties": {
@@ -472,6 +536,12 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
                     "required": ["summary_bullets", "gp_action_items"],
                     "additionalProperties": True,
                 },
+                "gp_followup_required": {
+                    "type": ["boolean", "null"],
+                },
+                "gp_followup_scheduled": {
+                    "type": ["boolean", "null"],
+                },
                 "llm_reasoning": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -487,12 +557,37 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             body = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
         gp = body.get("gp_handoff") or {}
+        gp_actions = gp.get("gp_action_items") or []
+
+        # If the LLM did not propose any GP action items but a GP follow-up
+        # appears required and provider context exists, synthesise a simple
+        # GP follow-up action so the demo always shows one.
+        try:
+            if not gp_actions:
+                followup_required = body.get("gp_followup_required")
+                providers = mcp_context.get("providers") if isinstance(mcp_context, dict) else None
+                prov_list = []
+                if isinstance(providers, dict) and isinstance(providers.get("providers"), list):
+                    prov_list = providers["providers"]
+                if (followup_required is True or followup_required is None) and prov_list:
+                    primary = prov_list[0] or {}
+                    desc = "GP follow-up appointment after discharge"
+                    gp_actions = [
+                        {
+                            "description": desc,
+                            "provider": primary.get("name") or primary.get("id") or "GP",
+                            "status": "PLANNED",
+                        }
+                    ]
+        except Exception:
+            pass
+
         data = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "gp_community_handoff",
             "gp_handoff": {
                 "summary_bullets": gp.get("summary_bullets") or [],
-                "gp_action_items": gp.get("gp_action_items") or [],
+                "gp_action_items": gp_actions,
                 "community_referrals": gp.get("community_referrals") or [],
             },
             "llm_reasoning": body.get("llm_reasoning")
@@ -506,6 +601,14 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
     # Step 5 (post-discharge monitoring) uses a schema to describe the next
     # check-in channel, timing, and tailored questions.
     if step == "step5":
+        system = (
+            system
+            + "\n\nFor this post-discharge monitoring step, you MUST:\n"
+            "- Use the patient's diagnosis, risk scores, medications, and recent events to tailor monitoring.\n"
+            "- Return at least 5 specific monitoring questions that could be asked at the next check-in.\n"
+            "- Include alert_rules describing when to escalate (e.g., flag responses that indicate deterioration, suicidality, or medication problems).\n"
+        )
+
         monitoring_schema = {
             "type": "object",
             "properties": {
