@@ -663,11 +663,12 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             executed["tasks"].append({"input": fup, "result": task_res})
 
             # Reflect execution back into the follow-up object so the JSON and
-            # UI can treat it as scheduled/requested via Task. We treat
-            # Task-backed items as ALREADY_SCHEDULED even if they are not yet
-            # present in the FOLLOW_UP_APPOINTMENTS.csv file.
+            # UI can treat it as created/requested via Task for this run. CSV-
+            # backed appointments remain ALREADY_SCHEDULED; Task-created ones
+            # are marked as CREATED so downstream views can distinguish new
+            # bookings from existing ones.
             try:
-                fup["status"] = "ALREADY_SCHEDULED"
+                fup["status"] = "CREATED"
                 # If there is no real slot from CSV, synthesise an approximate
                 # appointment_date_time from the LLM timeframe so the UI can
                 # display a concrete day/date/time rather than a vague phrase.

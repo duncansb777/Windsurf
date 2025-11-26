@@ -2196,6 +2196,7 @@ ASSISTANT:
             const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
             let missing = fups.filter(f => f.status === 'MISSING').length;
             let scheduled = fups.filter(f => f.status === 'ALREADY_SCHEDULED').length;
+            let created = fups.filter(f => f.status === 'CREATED').length;
 
             const raw = res.plan_raw || {};
             const appts = raw.follow_up_plan && Array.isArray(raw.follow_up_plan.appointments)
@@ -2265,70 +2266,51 @@ ASSISTANT:
               }
             } catch (e) {}
 
-            // If the agent has turned a missing mental health follow-up into an
-            // ALREADY_SCHEDULED appointment with a Task, surface that booking
-            // explicitly including date/time when available.
+            // Surface any newly CREATED follow-up appointments (Task-backed)
+            // explicitly, including date/time and reason, rather than only
+            // describing the first scheduled appointment.
             let bookingLine = '';
             try {
-              const firstScheduled = fups.find(f => f.status === 'ALREADY_SCHEDULED') || null;
-              let when = '';
-              if (firstScheduled) {
-                const raw = firstScheduled.appointment_date_time || firstScheduled.recommended_timeframe || '';
-                try {
-                  if (raw) {
-                    const d = new Date(raw);
-                    if (!isNaN(d.getTime())) {
-                      when = d.toLocaleString('en-AU', {
-                        timeZone: 'Australia/Sydney',
-                        weekday: 'short',
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
-                    } else {
-                      when = raw;
+              const createdFups = fups.filter(f => f.status === 'CREATED');
+              if (createdFups.length) {
+                const createdLines = createdFups.map(f => {
+                  const t = f.type || 'follow-up appointment';
+                  const reason = f.reason || '';
+                  const raw = f.appointment_date_time || f.recommended_timeframe || '';
+                  let when = '';
+                  try {
+                    if (raw) {
+                      const d = new Date(raw);
+                      if (!isNaN(d.getTime())) {
+                        when = d.toLocaleString('en-AU', {
+                          timeZone: 'Australia/Sydney',
+                          weekday: 'short',
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                      } else {
+                        when = raw;
+                      }
                     }
+                  } catch (e) {
+                    when = raw || '';
                   }
-                } catch (e) {
-                  when = raw || '';
-                }
-              } else if (appts.length && appts[0].date) {
-                try {
-                  const d = new Date(appts[0].date);
-                  if (!isNaN(d.getTime())) {
-                    when = d.toLocaleString('en-AU', {
-                      timeZone: 'Australia/Sydney',
-                      weekday: 'short',
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    });
-                  } else {
-                    when = appts[0].date;
-                  }
-                } catch (e) {
-                  when = appts[0].date;
-                }
-              }
-              if (firstScheduled) {
-                const t = firstScheduled.type || 'follow-up appointment';
-                const reason = firstScheduled.reason || '';
-                const taskId = firstScheduled.task_id || '';
-                let sentence = ` A <strong>${t}</strong> has been booked`;
-                if (when) sentence += ` for <strong>${when}</strong>`;
-                if (reason) sentence += ` because: ${reason}`;
-                if (taskId) sentence += ` (Task ID: ${taskId}).`;
-                else sentence += '.';
-                bookingLine = `<p>${sentence}</p>`;
+                  const taskId = f.task_id || '';
+                  let line = `<strong>${t}</strong>`;
+                  if (when) line += ` on <strong>${when}</strong>`;
+                  if (reason) line += ` because: ${reason}`;
+                  if (taskId) line += ` (Task ID: ${taskId})`;
+                  return `• ${line}`;
+                }).join('<br/>');
+                bookingLine = `<p><strong>Newly created follow-up appointments:</strong><br/>${createdLines}</p>`;
               }
             } catch (e) {}
 
             intro = `The Follow-Up Orchestration agent has reviewed which appointments <code>${pid}</code> needs after discharge. ` +
-                    `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.` +
+                    `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled, <strong>${created}</strong> appointment(s) created in this run, and <strong>${missing}</strong> still to be booked.` +
                     (apptLines ? `<p><strong>Follow-up appointments:</strong><br/>${apptLines}</p>` : '') +
                     bookingLine +
                     safetyLine;
