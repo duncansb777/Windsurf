@@ -592,8 +592,23 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             # If CSV context is unavailable, fall back to LLM-only planning.
             pass
 
-        # For any follow-ups the LLM still marks as MISSING (and for which no
-        # scheduled CSV entry was found), create a Task via Epic MCP.
+        # Normalise statuses: if anything is still labelled ALREADY_SCHEDULED
+        # but has neither a concrete appointment_date_time (from CSV) nor a
+        # Task backing it, treat it as MISSING so that only real bookings or
+        # explicit Task creations appear as scheduled in the plan.
+        for fup in required_followups:
+            try:
+                st = str(fup.get("status", "")).upper()
+                has_dt = bool(fup.get("appointment_date_time"))
+                has_task = bool(fup.get("task_id"))
+                if st == "ALREADY_SCHEDULED" and not has_dt and not has_task:
+                    fup["status"] = "MISSING"
+            except Exception:
+                continue
+
+        # For any follow-ups that remain MISSING after normalisation (i.e. they
+        # are required by the LLM but not present in FOLLOW_UP_APPOINTMENTS),
+        # create a Task via Epic MCP so every required booking is acted on.
         for fup in required_followups:
             if str(fup.get("status", "")).upper() != "MISSING":
                 continue
@@ -614,8 +629,11 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             executed["tasks"].append({"input": fup, "result": task_res})
 
             # Reflect execution back into the follow-up object so the JSON and
-            # UI can treat it as requested via Task.
+            # UI can treat it as scheduled/requested via Task. We treat
+            # Task-backed items as ALREADY_SCHEDULED even if they are not yet
+            # present in the FOLLOW_UP_APPOINTMENTS.csv file.
             try:
+                fup["status"] = "ALREADY_SCHEDULED"
                 if isinstance(task_res, dict) and task_res.get("id"):
                     fup["task_id"] = task_res["id"]
             except Exception:
