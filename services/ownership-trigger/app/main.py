@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import os
 import csv
 import time
+import json
 from typing import Optional, List
 from .ccs_tools import ccs_get_meter_reads
 from .agentis_demo import run_demo as agentis_run_demo
@@ -117,6 +118,148 @@ def demo_agentis(req: AgentisDemoRequest):
 def demo_agentis_referral(req: AgentisDemoRequest):
     pid = req.patient_id or "123"
     return agentis_run_referral(pid, extra_context=(req.context or {}))
+
+
+class HdStepRequest(BaseModel):
+    step_id: str
+    patient_id: Optional[str] = None
+    encounter_id: Optional[str] = None
+    patient: dict = {}
+    risk: dict = {}
+    prompt_pack: dict = {}
+    agent: Optional[str] = None
+
+
+def _run_hd_step(req: HdStepRequest, step: str) -> dict:
+    """Execute a Hospital Discharge step via the configured LLM provider.
+
+    The frontend passes patient + risk context and the active Prompt Studio
+    instructions/policies. We turn that into a step-specific system/user
+    prompt and ask the LLM to return structured JSON.
+    """
+
+    client = LLMClient()
+    pp = req.prompt_pack or {}
+    instructions = pp.get("instructions", "")
+    policies = pp.get("policies_markdown", "")
+
+    # Pull additional clinical context from MCP mocks so each step sees
+    # realistic EMR-style data in addition to the UI payload.
+    epic = make_epic_client()
+    hca = make_hca_client()
+    pid = req.patient_id or "123"
+
+    mcp_context: dict = {"patient_id": pid, "step_id": step}
+
+    try:
+        # Shared baseline: discharge event + patient bundle
+        mcp_context["discharge_event"] = epic.call("epic.discharge_event.get", {"patient_id": pid})
+        mcp_context["patient_bundle"] = epic.call("epic.patient_bundle.get", {"patient_id": pid})
+    except Exception:
+        # Keep context best-effort; UI should still work if MCP mock is offline
+        pass
+
+    try:
+        # Step-specific mock MCP data
+        if step == "step2":  # medication reconciliation
+            mcp_context["home_meds"] = epic.call("epic.search", {"resource_type": "MedicationRequest", "patient_id": pid})
+        elif step == "step3":  # follow-up orchestration
+            mcp_context["followup_observations"] = epic.call("epic.search", {"resource_type": "Observation", "patient_id": pid})
+        elif step == "step4":  # GP & community handoff
+            mcp_context["service_requests"] = epic.call("epic.search", {"resource_type": "ServiceRequest", "patient_id": pid})
+        elif step == "step5":  # post-discharge monitoring
+            mcp_context["care_plans"] = epic.call("epic.search", {"resource_type": "CarePlan", "patient_id": pid})
+        elif step == "step6":  # outcomes / governance
+            # For demo purposes, reuse audit search as a governance signal
+            mcp_context["audit"] = epic.call(
+                "epic.audit.search",
+                {"actor_ref": "Agent/demo-client", "entity_ref": None, "action": None},
+            )
+    except Exception:
+        pass
+
+    try:
+        # For some steps (handoff/referral), also show directory context from HCA MCP
+        if step in {"step3", "step4"}:
+            mcp_context["providers"] = hca.call(
+                "hca.directory.search_providers",
+                {"patient_id": pid, "location": "2000", "roles": ["GP", "Case Manager", "Pharmacist"], "consent_context": {}},
+            )
+    except Exception:
+        pass
+
+    # Build a compact context block for the user message
+    ctx = {
+        "step_id": step,
+        "agent": req.agent,
+        "patient_id": req.patient_id,
+        "encounter_id": req.encounter_id,
+        "patient": req.patient,
+        "risk": req.risk,
+        "mcp_context": mcp_context,
+    }
+
+    system = (
+        "You are a Hospital Discharge agent executing step "
+        f"{step}. Use the provided Prompt Studio instructions and "
+        "policies as guardrails. Return STRICT JSON only, matching the "
+        "schema for this step. Include an array field 'llm_reasoning' "
+        "with short bullet-point explanations of the decision.\n\n"
+        "INSTRUCTIONS:\n" + instructions + "\n\nPOLICIES:\n" + policies
+    )
+
+    user = (
+        "Here is the context for this discharge step as JSON. "
+        "Decide and populate the JSON result for this step. "
+        "Do not include any text outside the JSON object.\n\n" +
+        json.dumps(ctx, indent=2)
+    )
+
+    # Ask for free-form JSON; LLMClient will call OpenAI when configured
+    out = client.complete(system=system, user=user, tools=None, schema=None)
+    data = out.get("json") or {}
+    if not data:
+        # If we didn't get JSON back, fall back to embedding the text result
+        data = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+    # Ensure some minimum fields so the UI can always render
+    if "llm_reasoning" not in data:
+        data["llm_reasoning"] = [
+            f"LLM decision for {step} based on provided discharge, risk, and policy context."
+        ]
+    data.setdefault("patient_id", req.patient_id)
+    data.setdefault("agent", req.agent or f"hd_{step}")
+    return data
+
+
+@app.post("/demo/hd-step1")
+def demo_hd_step1(req: HdStepRequest):
+    return _run_hd_step(req, "step1")
+
+
+@app.post("/demo/hd-step2")
+def demo_hd_step2(req: HdStepRequest):
+    return _run_hd_step(req, "step2")
+
+
+@app.post("/demo/hd-step3")
+def demo_hd_step3(req: HdStepRequest):
+    return _run_hd_step(req, "step3")
+
+
+@app.post("/demo/hd-step4")
+def demo_hd_step4(req: HdStepRequest):
+    return _run_hd_step(req, "step4")
+
+
+@app.post("/demo/hd-step5")
+def demo_hd_step5(req: HdStepRequest):
+    return _run_hd_step(req, "step5")
+
+
+@app.post("/demo/hd-step6")
+def demo_hd_step6(req: HdStepRequest):
+    return _run_hd_step(req, "step6")
 
 
 class ConsentCheckRequest(BaseModel):

@@ -1649,13 +1649,41 @@ ASSISTANT:
           <td>${p.lace} <span style="display:block; font-size:11px; color:var(--muted);">${p.laceRisk}</span></td>
           <td>${p.hosp} <span style="display:block; font-size:11px; color:var(--muted);">${p.hospRisk}</span></td>
           <td><span class="${pillCls}">${riskLabel}</span></td>
-          <td>${p.status}</td>
+          <td class="hd-status-cell">${getHdStatusLabel(p)}</td>
         `;
         tr.addEventListener('click', () => selectHdPatient(p.patientId));
         tbody.appendChild(tr);
       });
 
       if (HD_PATIENTS[0]) selectHdPatient(HD_PATIENTS[0].patientId);
+    }
+
+    function getHdStatusLabel(p) {
+      const progressMap = window.__hdProgress || {};
+      const n = progressMap[p.patientId] || 0;
+      if (!n) return p.status;
+      const titles = {
+        1: 'Discharge Readiness & Risk',
+        2: 'Medication Reconciliation',
+        3: 'Follow-Up Orchestration',
+        4: 'GP & Community Handoff',
+        5: 'Post-Discharge Monitoring',
+        6: 'Outcomes & Governance Analytics'
+      };
+      const title = titles[n] || '';
+      return `${p.status} • Step ${n}/6${title ? ' – ' + title : ''}`;
+    }
+
+    function updateHdStatusForPatient(patientId) {
+      const tbody = document.getElementById('hd_inpatient_tbody');
+      if (!tbody) return;
+      const tr = tbody.querySelector(`tr[data-patient-id="${patientId}"]`);
+      if (!tr) return;
+      const p = HD_PATIENTS.find(x => x.patientId === patientId);
+      if (!p) return;
+      const cell = tr.querySelector('.hd-status-cell');
+      if (!cell) return;
+      cell.textContent = getHdStatusLabel(p);
     }
 
     function selectHdPatient(patientId) {
@@ -1716,7 +1744,7 @@ ASSISTANT:
         card.className = 'card';
         card.innerHTML = `<h4 style="margin:4px 0 6px;">${s.title}</h4>${s.body}`;
         stepsEl.appendChild(card);
-      }); // Added a closing parenthesis here
+      }); 
     }
 
     function getPromptStudioContext() {
@@ -1782,6 +1810,15 @@ ASSISTANT:
           ]
         };
         renderHdLogic(stepId, fallback);
+      }
+
+      // Update discharge progress for this patient and refresh Status column
+      const stepNum = parseInt(String(stepId).replace('step', ''), 10) || 0;
+      if (stepNum > 0) {
+        window.__hdProgress = window.__hdProgress || {};
+        const prev = window.__hdProgress[pid] || 0;
+        if (stepNum > prev) window.__hdProgress[pid] = stepNum;
+        updateHdStatusForPatient(pid);
       }
       window.__appendMode = true;
       showToast('Executed Hospital Discharge ' + stepId + ' agent.');
