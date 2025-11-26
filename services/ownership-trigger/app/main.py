@@ -550,6 +550,40 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         required_followups = plan.get("required_followups") or []
         executed: dict = {"tasks": []}
 
+        # Helper to synthesise a concrete appointment date/time from a
+        # free-text timeframe (e.g. "within 3-5 days", "within 1 week"). This
+        # is only used for demo purposes when no real slot exists in the CSV.
+        def _approx_appointment_datetime(timeframe: str | None) -> str | None:
+            try:
+                import re
+                from datetime import datetime, timedelta, timezone
+
+                if not timeframe:
+                    days = 7
+                else:
+                    tf = str(timeframe).lower()
+                    # First numeric token (handles ranges like "3-5" by
+                    # taking the lower bound).
+                    m = re.search(r"(\d+)", tf)
+                    if m:
+                        days = int(m.group(1))
+                    elif "fortnight" in tf:
+                        days = 14
+                    elif "week" in tf:
+                        days = 7
+                    elif "month" in tf:
+                        days = 30
+                    else:
+                        days = 7
+
+                now = datetime.now(timezone.utc)
+                dt = now + timedelta(days=days)
+                # Return ISO8601 with UTC offset so the UI can format it for
+                # the local display timezone.
+                return dt.isoformat()
+            except Exception:
+                return None
+
         # Enrich follow-ups using existing scheduled appointments from CSV so
         # that ONLY truly scheduled appointments are marked as ALREADY_SCHEDULED
         # and carry a real appointment date/time.
@@ -634,8 +668,54 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             # present in the FOLLOW_UP_APPOINTMENTS.csv file.
             try:
                 fup["status"] = "ALREADY_SCHEDULED"
+                # If there is no real slot from CSV, synthesise an approximate
+                # appointment_date_time from the LLM timeframe so the UI can
+                # display a concrete day/date/time rather than a vague phrase.
+                if not fup.get("appointment_date_time"):
+                    approx = _approx_appointment_datetime(fup.get("recommended_timeframe"))
+                    if approx:
+                        fup["appointment_date_time"] = approx
                 if isinstance(task_res, dict) and task_res.get("id"):
                     fup["task_id"] = task_res["id"]
+                # Also persist an EMR-level booking row so that downstream
+                # views see a concrete appointment in FOLLOW_UP_APPOINTMENTS.
+                try:
+                    appt_csv_path = os.path.join(BASE_DIR, "data", "csv", "FOLLOW_UP_APPOINTMENTS.csv")
+                    file_exists = os.path.exists(appt_csv_path)
+                    # Ensure file exists with header
+                    if not file_exists:
+                        with open(appt_csv_path, "w", newline="") as fcsv:
+                            w = csv.writer(fcsv)
+                            w.writerow([
+                                "APPOINTMENT_ID",
+                                "PATIENT_ID",
+                                "ENCOUNTER_ID",
+                                "TYPE",
+                                "PROVIDER_ID",
+                                "DATE_TIME",
+                                "STATUS",
+                            ])
+                    # Append the new appointment row
+                    from datetime import datetime
+                    appt_id = f"FU-{pid}-{int(time.time())}"
+                    enc_id = req.encounter_id or f"ENC{str(pid)[1:]}"
+                    prov_id = fup.get("provider_id") or ""
+                    dt_str = fup.get("appointment_date_time") or ""
+                    with open(appt_csv_path, "a", newline="") as fcsv:
+                        w = csv.writer(fcsv)
+                        w.writerow([
+                            appt_id,
+                            pid,
+                            enc_id,
+                            fup.get("type") or "appointment",
+                            prov_id,
+                            dt_str,
+                            "SCHEDULED",
+                        ])
+                except Exception:
+                    # Best-effort only; if EMR CSV write fails we still keep
+                    # the Task-backed booking for this demo.
+                    pass
             except Exception:
                 pass
 
