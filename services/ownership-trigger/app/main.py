@@ -215,6 +215,107 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         json.dumps(ctx, indent=2)
     )
 
+    # Step 1 (discharge readiness & risk) uses a structured JSON schema so we
+    # get a predictable risk band, discharge bundle, and reasoning.
+    if step == "step1":
+        readiness_schema = {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": ["string", "null"]},
+                "agent": {"type": ["string", "null"]},
+                "overall_risk_band": {"type": "string"},
+                "recommended_bundle": {"type": "string"},
+                "risk_factors": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "flags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["overall_risk_band"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=readiness_schema)
+        body = out.get("json") or {}
+        if not body:
+            body = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        data: dict = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "discharge_readiness_risk",
+            "overall_risk_band": body.get("overall_risk_band") or ctx["risk"].get("overall_risk_band") or ctx["risk"].get("lace_plus_risk_level"),
+            "recommended_bundle": body.get("recommended_bundle"),
+            "risk_factors": body.get("risk_factors") or [],
+            "flags": body.get("flags") or [],
+            "llm_reasoning": body.get("llm_reasoning")
+            or [
+                f"LLM classified discharge readiness risk as {body.get('overall_risk_band') or 'UNKNOWN'} based on LACE+, HOSPITAL, and policy context.",
+            ],
+            "plan_raw": body,
+        }
+        return data
+
+    # Step 2 (medication reconciliation) uses a structured JSON schema focused
+    # on continued/started/stopped medicines and key counselling points.
+    if step == "step2":
+        med_schema = {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": ["string", "null"]},
+                "agent": {"type": ["string", "null"]},
+                "reconciliation": {
+                    "type": "object",
+                    "properties": {
+                        "continued": {"type": "array", "items": {"type": "object"}},
+                        "started": {"type": "array", "items": {"type": "object"}},
+                        "stopped": {"type": "array", "items": {"type": "object"}},
+                        "education_points": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["continued", "started", "stopped"],
+                    "additionalProperties": True,
+                },
+                "llm_reasoning": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                },
+            },
+            "required": ["reconciliation"],
+            "additionalProperties": True,
+        }
+
+        out = client.complete(system=system, user=user, tools=None, schema=med_schema)
+        body = out.get("json") or {}
+        if not body:
+            body = {"raw_text": out.get("text", ""), "model": out.get("model")}
+
+        recon = body.get("reconciliation") or {}
+        data = {
+            "patient_id": req.patient_id or pid,
+            "agent": req.agent or "medication_reconciliation",
+            "reconciliation": {
+                "continued": recon.get("continued") or [],
+                "started": recon.get("started") or [],
+                "stopped": recon.get("stopped") or [],
+                "education_points": recon.get("education_points") or [],
+            },
+            "llm_reasoning": body.get("llm_reasoning")
+            or [
+                "Medication reconciliation decisions were derived from home meds, in-hospital orders, discharge plan, and risk context.",
+            ],
+            "plan_raw": body,
+        }
+        return data
+
     # Step 3 (follow-up orchestration) uses a structured JSON schema so we
     # can both display the plan and execute it via Epic MCP tools.
     if step == "step3":
