@@ -2215,17 +2215,41 @@ ASSISTANT:
                   status: a.status || '',
                   timeframe: a.recommended_timeframe || '',
                   channel: a.channel || '',
+                  appointmentDateTime: a.appointment_date_time || '',
                 }))
               : appts.map(a => ({
                   type: a.type || 'follow-up appointment',
                   status: a.status || 'ALREADY_SCHEDULED',
                   timeframe: a.date || '',
                   channel: a.channel || '',
+                  appointmentDateTime: a.date || '',
                 }));
 
             const apptLines = allAppts.map(a => {
               const bits = [a.type];
-              if (a.timeframe) bits.push(a.timeframe);
+              let whenLabel = '';
+              try {
+                const raw = a.appointmentDateTime || a.timeframe || '';
+                if (raw) {
+                  const d = new Date(raw);
+                  if (!isNaN(d.getTime())) {
+                    whenLabel = d.toLocaleString('en-AU', {
+                      timeZone: 'Australia/Sydney',
+                      weekday: 'short',
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                  } else {
+                    whenLabel = raw;
+                  }
+                }
+              } catch (e) {
+                whenLabel = a.timeframe || '';
+              }
+              if (whenLabel) bits.push(whenLabel);
               if (a.channel) bits.push(a.channel);
               if (a.status) bits.push(`status: ${a.status}`);
               return `• ${bits.join(' · ')}`;
@@ -2248,10 +2272,47 @@ ASSISTANT:
             try {
               const firstScheduled = fups.find(f => f.status === 'ALREADY_SCHEDULED') || null;
               let when = '';
-              if (firstScheduled && firstScheduled.recommended_timeframe) {
-                when = firstScheduled.recommended_timeframe;
+              if (firstScheduled) {
+                const raw = firstScheduled.appointment_date_time || firstScheduled.recommended_timeframe || '';
+                try {
+                  if (raw) {
+                    const d = new Date(raw);
+                    if (!isNaN(d.getTime())) {
+                      when = d.toLocaleString('en-AU', {
+                        timeZone: 'Australia/Sydney',
+                        weekday: 'short',
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                    } else {
+                      when = raw;
+                    }
+                  }
+                } catch (e) {
+                  when = raw || '';
+                }
               } else if (appts.length && appts[0].date) {
-                when = appts[0].date;
+                try {
+                  const d = new Date(appts[0].date);
+                  if (!isNaN(d.getTime())) {
+                    when = d.toLocaleString('en-AU', {
+                      timeZone: 'Australia/Sydney',
+                      weekday: 'short',
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                  } else {
+                    when = appts[0].date;
+                  }
+                } catch (e) {
+                  when = appts[0].date;
+                }
               }
               if (firstScheduled) {
                 const t = firstScheduled.type || 'follow-up appointment';

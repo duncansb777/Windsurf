@@ -550,7 +550,50 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         required_followups = plan.get("required_followups") or []
         executed: dict = {"tasks": []}
 
-        # For any follow-ups the LLM marks as MISSING, create a Task via Epic MCP
+        # Enrich follow-ups using existing scheduled appointments from CSV so
+        # that ONLY truly scheduled appointments are marked as ALREADY_SCHEDULED
+        # and carry a real appointment date/time.
+        try:
+            csv_dir = os.path.join(BASE_DIR, "data", "csv")
+            appt_path = os.path.join(csv_dir, "FOLLOW_UP_APPOINTMENTS.csv")
+            existing_by_type: dict[str, dict] = {}
+            if os.path.exists(appt_path):
+                with open(appt_path, newline="") as f:
+                    rdr = csv.DictReader(f)
+                    for row in rdr:
+                        if not row.get("PATIENT_ID") or row.get("PATIENT_ID") != pid:
+                            continue
+                        if (row.get("STATUS") or "").upper() != "SCHEDULED":
+                            continue
+                        tkey = (row.get("TYPE") or "").strip().lower()
+                        if not tkey:
+                            continue
+                        # If multiple rows share a type, keep the first for now.
+                        existing_by_type.setdefault(tkey, row)
+
+            # Attach concrete appointment info to matching follow-ups.
+            for fup in required_followups:
+                tkey = (str(fup.get("type")) or "").strip().lower()
+                if not tkey or tkey not in existing_by_type:
+                    continue
+                row = existing_by_type[tkey]
+                try:
+                    fup["status"] = "ALREADY_SCHEDULED"
+                    if row.get("DATE_TIME"):
+                        fup["appointment_date_time"] = row["DATE_TIME"]
+                    if row.get("APPOINTMENT_ID"):
+                        fup["appointment_id"] = row["APPOINTMENT_ID"]
+                    if row.get("PROVIDER_ID"):
+                        fup["provider_id"] = row["PROVIDER_ID"]
+                except Exception:
+                    # Enrichment is best-effort; do not fail the whole step.
+                    pass
+        except Exception:
+            # If CSV context is unavailable, fall back to LLM-only planning.
+            pass
+
+        # For any follow-ups the LLM still marks as MISSING (and for which no
+        # scheduled CSV entry was found), create a Task via Epic MCP.
         for fup in required_followups:
             if str(fup.get("status", "")).upper() != "MISSING":
                 continue
@@ -571,9 +614,8 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             executed["tasks"].append({"input": fup, "result": task_res})
 
             # Reflect execution back into the follow-up object so the JSON and
-            # UI can treat it as scheduled rather than still missing.
+            # UI can treat it as requested via Task.
             try:
-                fup["status"] = "ALREADY_SCHEDULED"
                 if isinstance(task_res, dict) and task_res.get("id"):
                     fup["task_id"] = task_res["id"]
             except Exception:
