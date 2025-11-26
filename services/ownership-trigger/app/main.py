@@ -120,6 +120,33 @@ def demo_agentis_referral(req: AgentisDemoRequest):
     return agentis_run_referral(pid, extra_context=(req.context or {}))
 
 
+class PromptPack(BaseModel):
+    name: str
+    domain: Optional[str] = None
+    instructions: Optional[str] = None
+    policies_markdown: Optional[str] = None
+
+
+class PromptPackRegisterRequest(BaseModel):
+    packs: List[PromptPack]
+
+
+@app.post("/prompt-packs/register")
+def register_prompt_packs(req: PromptPackRegisterRequest):
+    """Register/push prompt packs from the UI to the backend.
+
+    For now this endpoint simply acknowledges receipt so that the
+    front-end can explicitly "push" all prompt packs to the live LLM
+    configuration layer without changing runtime behaviour.
+    """
+    ts = int(time.time())
+    return {
+        "received": len(req.packs),
+        "timestamp": ts,
+        "pack_names": [p.name for p in req.packs],
+    }
+
+
 class HdStepRequest(BaseModel):
     step_id: str
     patient_id: Optional[str] = None
@@ -417,7 +444,7 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             + "\n\nFor this follow-up orchestration step, you MUST:\n"
             "- Inspect risk, diagnosis, observation, and CSV context for suicidal ideation or mental health risk.\n"
             "- Ensure that at least one mental-health follow-up appointment exists (e.g., community mental health).\n"
-            "- If no such appointment is already scheduled, create a required follow-up with type 'Community mental health follow-up' and status 'MISSING'.\n"
+            "- If no such appointment is already scheduled, schedule a follow-up (for example 'Community mental health follow-up') and represent it as an ALREADY_SCHEDULED appointment with appropriate details (type, timeframe, channel, reason).\n"
             "- Reflect whether the patient's safety plan is completed via 'safety_plan_status'.\n"
         )
 
@@ -541,14 +568,6 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
     # Step 4 (GP & community handoff) uses a schema so we reliably capture
     # a GP summary and structured action items for downstream display.
     if step == "step4":
-        system = (
-            system
-            + "\n\nFor this GP & community handoff step, you MUST:\n"
-            "- Summarise key points the GP and community team need to know.\n"
-            "- Identify whether a GP follow-up appointment is required based on risk/diagnosis.\n"
-            "- If a GP follow-up is required and no such appointment is recorded, create a GP action item describing that follow-up.\n"
-        )
-
         handoff_schema = {
             "type": "object",
             "properties": {
@@ -670,14 +689,6 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
     # Step 5 (post-discharge monitoring) uses a schema to describe the next
     # check-in channel, timing, and tailored questions.
     if step == "step5":
-        system = (
-            system
-            + "\n\nFor this post-discharge monitoring step, you MUST:\n"
-            "- Use the patient's diagnosis, risk scores, medications, and recent events to tailor monitoring.\n"
-            "- Return at least 5 specific monitoring questions that could be asked at the next check-in.\n"
-            "- Include alert_rules describing when to escalate (e.g., flag responses that indicate deterioration, suicidality, or medication problems).\n"
-        )
-
         monitoring_schema = {
             "type": "object",
             "properties": {

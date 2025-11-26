@@ -1340,12 +1340,39 @@ ASSISTANT:
     // Navigation
     const buttons = document.querySelectorAll('#nav button');
     const views = document.querySelectorAll('.view');
+
+    async function pushAllPromptPacks() {
+      try {
+        const packs = Object.entries(PROMPT_PACKS || {}).map(([name, cfg]) => ({
+          name,
+          domain: cfg.domain || '',
+          instructions: cfg.instructions || '',
+          policies_markdown: cfg.policies || ''
+        }));
+        if (!packs.length) return;
+        await fetch('http://localhost:8000/prompt-packs/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packs })
+        });
+      } catch (e) {
+        // Best-effort only; failures should not break the demo UI.
+        console.warn('Failed to push prompt packs', e);
+      }
+    }
+
     function goToView(id) {
       views.forEach(v => v.classList.remove('active'));
       document.getElementById(id).classList.add('active');
       buttons.forEach(b => b.classList.toggle('active', b.dataset.view === id));
       window.scrollTo({ top: 0, behavior: 'instant' });
+      // When opening the Health Agents view, push all configured prompt packs
+      // to the backend so the live LLM sees the latest instructions/policies.
+      if (id === 'agent') {
+        pushAllPromptPacks();
+      }
     }
+
     buttons.forEach(b => b.addEventListener('click', () => goToView(b.dataset.view)));
 
     // Agent execution helpers
@@ -1832,6 +1859,27 @@ ASSISTANT:
         const prev = window.__hdProgress[pid] || 0;
         if (stepNum > prev) window.__hdProgress[pid] = stepNum;
         updateHdStatusForPatient(pid);
+
+        // If Step 2 has just completed for this patient, update the Step 2
+        // card status pill from Pending to Completed without reloading cards.
+        if (stepId === 'step2') {
+          try {
+            const stepsEl = document.getElementById('hd_step_cards');
+            if (stepsEl) {
+              const cards = stepsEl.querySelectorAll('.card');
+              cards.forEach(card => {
+                if (card.textContent.includes('Step 2') || card.textContent.includes('Med Reconciliation')) {
+                  const span = card.querySelector('span.pill');
+                  if (span) {
+                    span.textContent = 'Completed';
+                    span.classList.remove('warn');
+                    if (!span.classList.contains('ok')) span.classList.add('ok');
+                  }
+                }
+              });
+            }
+          } catch (e) {}
+        }
       }
       window.__appendMode = true;
       showToast('Executed Hospital Discharge ' + stepId + ' agent.');
