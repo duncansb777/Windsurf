@@ -1814,7 +1814,29 @@ ASSISTANT:
       const p = HD_PATIENTS.find(x => x.patientId === pid);
       if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
       const kind = 'hd_' + stepId;
-      const promptCtx = getPromptStudioContext();
+
+      // Automatically choose the relevant Prompt Studio pack for this step,
+      // so the correct instructions/policies are always submitted to the LLM
+      // without requiring the user to manually select/submit packs.
+      const baseCtx = getPromptStudioContext();
+      const packPerStep = {
+        step1: 'Hospital – Discharge Readiness & Risk Agent',
+        step2: 'Hospital – Medication Reconciliation Agent',
+        step3: 'Hospital – Follow-Up Orchestration Agent',
+        step4: 'Hospital – GP & Community Handoff Agent',
+        step5: 'Hospital – Post-Discharge Monitoring Agent',
+        step6: 'Hospital – Outcomes & Governance Analytics Agent'
+      };
+      const autoPackName = packPerStep[stepId] || baseCtx.pack || '';
+      const packCfg = autoPackName && PROMPT_PACKS[autoPackName] ? PROMPT_PACKS[autoPackName] : null;
+      const promptCtx = {
+        pack: autoPackName,
+        domain: (packCfg && packCfg.domain) || baseCtx.domain || 'health',
+        // Prefer any live Prompt Studio edits; otherwise fall back to the
+        // default instructions/policies defined for this pack.
+        instructions: (baseCtx.instructions && baseCtx.instructions.trim()) || (packCfg && packCfg.instructions) || '',
+        policies_markdown: (baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) || (packCfg && packCfg.policies) || ''
+      };
 
       const basePayload = {
         step_id: stepId,
@@ -2249,7 +2271,12 @@ ASSISTANT:
             const referralsArr = Array.isArray(gp.community_referrals) ? gp.community_referrals : [];
 
             function gpActionLabel(a) {
-              const desc = a.description || a.summary || 'GP follow-up';
+              if (!a) return '';
+              // gp_action_items may be simple strings or richer objects
+              if (typeof a === 'string') {
+                return a.trim();
+              }
+              const desc = a.description || a.summary || '';
               let prov = a.provider || a.gp || '';
               if (Array.isArray(prov)) {
                 // Sometimes provider comes through as an array of rich-text spans,
@@ -2261,15 +2288,26 @@ ASSISTANT:
               } else if (prov && typeof prov === 'object') {
                 prov = prov.name || prov.text || prov.id || '';
               }
-              const when = a.when || a.timeframe || a.due || '';
-              const bits = [desc];
+              const when = a.when || a.timeframe || a.due || a.scheduled_time || '';
+              const bits = [];
+              if (desc) bits.push(desc);
               if (prov) bits.push(`with ${prov}`);
               if (when) bits.push(when);
-              return bits.join(' · ');
+              return bits.join(' · ').trim();
             }
 
             const summaryLines = summaryArr.map(b => `• ${b}`).join('<br/>');
-            const gpLines = actionsArr.map(a => `• ${gpActionLabel(a)}`).join('<br/>');
+            const seenGp = new Set();
+            const gpLines = actionsArr
+              .map(a => gpActionLabel(a))
+              .filter(line => {
+                if (!line) return false;
+                if (line.toLowerCase() === 'gp follow-up') return false; // skip placeholder-only entries
+                if (seenGp.has(line)) return false;
+                seenGp.add(line);
+                return true;
+              })
+              .map(line => `• ${line}`).join('<br/>');
             const refLines = referralsArr.map(r => {
               const type = r.type || r.service || 'Referral';
               const dest = r.to || r.organization || '';
