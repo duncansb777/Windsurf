@@ -1047,17 +1047,21 @@ CONTEXT:
 {{provider_directory}}           # from EHR_GP_INFORMATION, SPECIALIST_DIRECTORY
 
 ASSISTANT:
-1) Determine required follow-ups (e.g. GP in 3–5 days, cardiology in 2–4 weeks, pathology in 1 week).
-2) Compare with already scheduled appointments and mark:
-   - "already_scheduled"
-   - "missing" (to be booked)
+1) Determine required follow-ups (e.g. GP in 3–5 days, cardiology in 2–4 weeks, pathology in 1 week), based on the specific patient’s diagnoses, risk band and rules.
+2) Ensure that every discharged patient has a GP follow-up with their relevant GP unless the context clearly indicates this is not appropriate (e.g. GP does not exist or another service is explicitly responsible).
+3) For mental-health or suicide-risk patients, ensure that an appropriate mental-health/community follow-up is present, or explicitly explain in the reasoning why no such follow-up is required.
+4) Compare required follow-ups with already scheduled appointments and mark:
+   - "ALREADY_SCHEDULED" when a matching appointment exists.
+   - "MISSING" when an appointment is clinically required but not yet booked.
 
-3) For missing appointments, propose:
-   - type (GP, cardiology, respiratory, pathology, allied health)
-   - recommended time window
-   - urgency band (LOW/MODERATE/HIGH)
+5) For each follow-up, propose:
+   - type (GP, cardiology, respiratory, pathology, allied health, mental health, etc.)
+   - recommended_timeframe (e.g. "within 7 days")
+   - channel (in-person, telehealth, phone, etc.)
+   - priority / urgency band (LOW/MODERATE/HIGH)
+   - clear clinical reason.
 
-4) Output strict JSON only:
+6) Output strict JSON only:
 
 {
   "patient_id": "<PATIENT_ID>",
@@ -1076,20 +1080,20 @@ ASSISTANT:
     }
   ]
 }`,
-        policies: `- Do not modify booking systems directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
-        examples: [
-          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-        ],
-        context_hint: 'Uses EMR/PAS CSVs for discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory.',
-        context_preview: 'Discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory from CSVs.'
-      },
-      'Hospital – GP & Community Handoff Agent': {
-        domain: 'health',
-        title: 'Hospital – GP & Community Handoff Agent',
-        desc: 'LLM prompt for the GP & Community Handoff Agent.',
-        affects: 'gp_community_handoff_agent',
-        instructions: `SYSTEM:
+            policies: `- Do not modify booking systems directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up, and ensure an appropriate mental-health/community follow-up exists when indicated.\n- Ensure every discharged patient has a GP follow-up with their own GP (from EMR GP information) unless the context clearly shows this is not required or appropriate, and document that reasoning.\n- Respect genuinely low-risk cases where no specialist follow-up beyond routine GP review is needed.\n- Prefer simple, patient-friendly language when describing follow-up plans.`,
+            examples: [
+              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+            ],
+            context_hint: 'Uses EMR/PAS CSVs for discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory.',
+            context_preview: 'Discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory from CSVs.'
+          },
+          'Hospital – GP & Community Handoff Agent': {
+            domain: 'health',
+            title: 'Hospital – GP & Community Handoff Agent',
+            desc: 'LLM prompt for the GP & Community Handoff Agent.',
+            affects: 'gp_community_handoff_agent',
+            instructions: `SYSTEM:
 You are the GP & Community Handoff Agent.
 Your tasks:
 1) Summarise the hospital stay in a GP-friendly way.
@@ -1110,13 +1114,17 @@ ASSISTANT:
 1) Produce a succinct GP summary (max ~10 bullet points), covering:
    - reason for admission and key diagnoses
    - key in-hospital events/procedures
-   - current problems and risks
+   - current problems and risks (including mental-health or suicide risk where present)
    - discharge medications (high level)
-   - follow-up and monitoring plan
+   - follow-up and monitoring plan, including which follow-ups the GP is responsible for.
 
-2) Capture clear GP actions and community service actions.
+2) Populate gp_handoff.summary_bullets with these key points so the GP can quickly understand the admission and discharge story.
 
-3) Output strict JSON only:
+3) Populate gp_handoff.gp_action_items with concrete actions the GP should take (e.g. review medications, check wounds, follow up on tests, confirm community supports). Include provider information or identifiers where available from gp_info.
+
+4) Populate gp_handoff.community_referrals (or community_handoff) with any required community service actions, including service name, reason_for_referral, priority and requested_followup timing.
+
+5) Output strict JSON only:
 
 {
   "patient_id": "<PATIENT_ID>",
@@ -1141,14 +1149,15 @@ ASSISTANT:
     }
   ]
 }`,
-        policies: `- Do not modify GP/community services directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
-        examples: [
-          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-        ],
-        context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
-        context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
-      },
+            policies: `- Do not modify GP/community services directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) so that GP and community action items explicitly address those risks.\n- Ensure gp_handoff.summary_bullets and gp_action_items are populated for every discharge handover, not left empty.\n- Prefer simple, GP-friendly and patient-friendly language in summaries and recommendations.`,
+            examples: [
+              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+            ],
+            context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
+            context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
+          },
+        },
       'Hospital – Post-Discharge Monitoring Agent': {
         domain: 'health',
         title: 'Hospital – Post-Discharge Monitoring Agent',

@@ -187,7 +187,9 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         pass
 
     # Also surface core EMR CSV slices so every step can see the same
-    # underlying mock EMR snapshot for the selected patient.
+    # underlying mock EMR snapshot for the selected patient. In addition to a
+    # fixed set of core files, we attach any other CSVs that contain a
+    # PATIENT_ID column so the LLM can see as much EMR context as possible.
     try:
         csv_ctx: dict = {}
         csv_dir = os.path.join(BASE_DIR, "data", "csv")
@@ -201,6 +203,10 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             with open(path, newline="") as f:
                 rdr = csv.DictReader(f)
                 fieldnames = rdr.fieldnames or []
+                if patient_key not in (fieldnames or []):
+                    # This CSV does not contain per-patient rows keyed by the
+                    # requested patient_key; skip it for patient-scoped views.
+                    return []
                 for r in rdr:
                     if r.get(patient_key) == pid:
                         rows.append(r)
@@ -221,6 +227,25 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         csv_ctx["risk_hospital"] = _load_csv("RISK_SCORE_HOSPITAL.csv")
         csv_ctx["risk_lace_plus"] = _load_csv("RISK_SCORE_LACE_PLUS.csv")
         csv_ctx["demographics"] = _load_csv("EMR_PATIENT_DEMOGRAPHICS.csv")
+
+        # Attach any other CSVs that expose PATIENT_ID but are not already
+        # mapped above, so the LLM can use them if relevant. Keys are the
+        # lowercase filename without extension.
+        try:
+            existing_keys = set(csv_ctx.keys())
+            for fname in os.listdir(csv_dir):
+                if not fname.lower().endswith(".csv"):
+                    continue
+                base = os.path.splitext(fname)[0]
+                key = base.lower()
+                if key in existing_keys:
+                    continue
+                extra_rows = _load_csv(fname, patient_key="PATIENT_ID")
+                if extra_rows:
+                    csv_ctx[key] = extra_rows
+        except Exception:
+            # Best-effort only for additional CSVs
+            pass
 
         mcp_context["csv"] = csv_ctx
     except Exception:
@@ -526,83 +551,6 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         required_followups = plan.get("required_followups") or []
         executed: dict = {"tasks": []}
 
-        # If the model did not propose any follow-ups but risk/diagnosis context
-        # suggests a need for mental health follow-up, synthesise one so the
-        # downstream execution and narrative remain meaningful. For clearly
-        # low-risk patients, respect the LLM decision that no additional
-        # specialist follow-up is required.
-        if not required_followups:
-            try:
-                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
-                diag_rows = csv_ctx.get("diagnosis") or []
-                risk_lace = csv_ctx.get("risk_lace_plus") or []
-
-                # Treat as high risk only when the risk band/category explicitly
-                # indicates HIGH, not merely because a row exists.
-                high_risk = False
-                for r in risk_lace:
-                    band = (r.get("RISK_BAND") or r.get("RISK_CATEGORY") or r.get("RISK_LEVEL") or "").upper()
-                    if "HIGH" in band:
-                        high_risk = True
-                        break
-
-                mh_diag = any(
-                    "depress" in (r.get("DESCRIPTION", "").lower())
-                    or "suicid" in (r.get("DESCRIPTION", "").lower())
-                    for r in diag_rows
-                )
-
-                if high_risk or mh_diag:
-                    required_followups = [
-                        {
-                            "type": "Community mental health follow-up",
-                            "reason": "High readmission / mental health risk at discharge; ensure timely community review.",
-                            "recommended_timeframe": "within 7 days",
-                            "status": "MISSING",
-                            "channel": "in-person or telehealth",
-                            "priority": "high",
-                        }
-                    ]
-                    plan["required_followups"] = required_followups
-            except Exception:
-                pass
-
-        # Ensure that every patient has at least one GP follow-up appointment
-        # scheduled with their relevant GP. If the LLM (or the above mental
-        # health fallback) did not include a GP-type follow-up, derive one from
-        # GP EMR context so that a GP appointment is always booked.
-        try:
-            has_gp_followup = any(
-                isinstance(f.get("type"), str)
-                and "gp" in f["type"].lower()
-                for f in required_followups
-            )
-            if not has_gp_followup:
-                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
-                gp_rows = csv_ctx.get("gp_information") or []
-                gp_name = None
-                if gp_rows:
-                    g0 = gp_rows[0]
-                    gp_name = g0.get("GP_NAME") or None
-
-                label = "GP follow-up appointment"
-                if gp_name:
-                    label = f"GP follow-up with {gp_name}"
-
-                gp_follow = {
-                    "type": "GP follow-up",
-                    "reason": "Routine post-discharge GP review.",
-                    "recommended_timeframe": "within 7 days",
-                    "status": "MISSING",
-                    "channel": "in-person or telehealth",
-                    "priority": "medium",
-                    "description": label,
-                }
-                required_followups.append(gp_follow)
-                plan["required_followups"] = required_followups
-        except Exception:
-            pass
-
         # For any follow-ups the LLM marks as MISSING, create a Task via Epic MCP
         for fup in required_followups:
             if str(fup.get("status", "")).upper() != "MISSING":
@@ -695,61 +643,6 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
 
         gp = body.get("gp_handoff") or {}
         gp_actions = gp.get("gp_action_items") or []
-
-        # Enrich with EMR GP information and diagnosis/risk where available.
-        csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
-        gp_rows = csv_ctx.get("gp_information") or []
-        diag_rows = csv_ctx.get("diagnosis") or []
-        risk_lace_rows = csv_ctx.get("risk_lace_plus") or []
-        risk_hosp_rows = csv_ctx.get("risk_hospital") or []
-
-        # If the LLM did not provide summary bullets, derive a simple discharge
-        # summary from diagnosis and risk scores so the GP sees key context.
-        if not gp.get("summary_bullets"):
-            bullets: list[str] = []
-            if diag_rows:
-                d0 = diag_rows[0]
-                desc = d0.get("DESCRIPTION") or "Primary diagnosis"
-                code = d0.get("CODE") or ""
-                bullets.append(f"Primary diagnosis: {desc}{' (' + code + ')' if code else ''}.")
-            if risk_lace_rows:
-                bullets.append("Elevated LACE+ readmission risk for this discharge.")
-            if risk_hosp_rows:
-                bullets.append("Hospital score indicates higher in-hospital risk factors.")
-            if not bullets:
-                bullets.append("Hospital discharge with chronic condition follow-up required.")
-            gp.setdefault("summary_bullets", bullets)
-
-        # If the LLM did not propose any GP action items but a GP follow-up
-        # appears required and provider context exists, synthesise a simple
-        # GP follow-up action so the demo always shows one.
-        try:
-            if not gp_actions:
-                followup_required = body.get("gp_followup_required")
-                # Prefer GP details from EHR_GP_INFORMATION; fall back to
-                # provider directory only if needed.
-                gp_name = None
-                if gp_rows:
-                    g0 = gp_rows[0]
-                    gp_name = g0.get("GP_NAME") or None
-
-                providers = mcp_context.get("providers") if isinstance(mcp_context, dict) else None
-                prov_list = []
-                if isinstance(providers, dict) and isinstance(providers.get("providers"), list):
-                    prov_list = providers["providers"]
-
-                if (followup_required is True or followup_required is None) and (gp_name or prov_list):
-                    desc = "GP follow-up appointment after discharge"
-                    provider_label = gp_name or (prov_list[0].get("name") or prov_list[0].get("id") if prov_list else "GP")
-                    gp_actions = [
-                        {
-                            "description": desc,
-                            "provider": provider_label,
-                            "status": "PLANNED",
-                        }
-                    ]
-        except Exception:
-            pass
 
         data = {
             "patient_id": req.patient_id or pid,
