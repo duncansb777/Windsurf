@@ -1500,7 +1500,13 @@ ASSISTANT:
         discharge: '/demo/discharge',
         agenticReferral: '/demo/agentis-referral',
         consent: '/demo/consent-check',
-        uber: '/demo/uber'
+        uber: '/demo/uber',
+        hd_step1: '/demo/hd-step1',
+        hd_step2: '/demo/hd-step2',
+        hd_step3: '/demo/hd-step3',
+        hd_step4: '/demo/hd-step4',
+        hd_step5: '/demo/hd-step5',
+        hd_step6: '/demo/hd-step6'
       }
     };
 
@@ -1710,137 +1716,75 @@ ASSISTANT:
         card.className = 'card';
         card.innerHTML = `<h4 style="margin:4px 0 6px;">${s.title}</h4>${s.body}`;
         stepsEl.appendChild(card);
-      });
+      }); // Added a closing parenthesis here
     }
 
-    function runHdStep(stepId) {
+    function getPromptStudioContext() {
+      const packName = window.__currentPackName || (document.querySelector('#packList button.active')?.dataset.pack) || '';
+      const instrEl = document.getElementById('packInstructions');
+      const polEl = document.getElementById('policyText');
+      const domainSel = document.getElementById('studioDomain');
+      return {
+        pack: packName,
+        domain: domainSel ? domainSel.value : '',
+        instructions: instrEl ? instrEl.value : '',
+        policies_markdown: polEl ? polEl.value : ''
+      };
+    }
+
+    async function runHdStep(stepId) {
       const pid = window.__hdSelectedPatientId;
       if (!pid) { showToast('Select a patient in Hospital Discharge panel first.'); return; }
       const p = HD_PATIENTS.find(x => x.patientId === pid);
       if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
-      let payload;
       const kind = 'hd_' + stepId;
+      const promptCtx = getPromptStudioContext();
 
-      if (stepId === 'step1') {
-        payload = {
-          patient_id: pid,
-          encounter_id: 'ENC' + pid.slice(1),
-          summary: [
-            `Ward: ${p.ward}, risk band ${p.laceRisk}/${p.hospRisk}.`,
-            p.atsi || p.ndis ? 'Additional flags present (ATSI/NDIS).' : 'No ATSI/NDIS flags recorded.'
-          ],
-          discharge_readiness: p.status.indexOf('Ready') >= 0 ? 'READY_24_48H' : 'NOT_READY',
+      const basePayload = {
+        step_id: stepId,
+        patient_id: pid,
+        encounter_id: 'ENC' + pid.slice(1),
+        patient: {
+          name: p.name,
+          ward: p.ward,
+          lace: p.lace,
+          laceRisk: p.laceRisk,
+          hosp: p.hosp,
+          hospRisk: p.hospRisk,
+          status: p.status,
+          atsi: p.atsi,
+          ndis: p.ndis
+        },
+        risk: {
           lace_plus_risk_level: p.laceRisk,
-          hospital_risk_level: p.hospRisk,
-          overall_risk_band: (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE'),
-          recommended_bundle: (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE'),
-          key_risk_drivers: [p.ward, p.laceRisk + ' LACE+']
-        };
-        payload.llm_reasoning = [
-          'Identify ward and risk factors from LACE+ and HOSPITAL scores.',
-          'If either score is HIGH, set overall_risk_band and recommended_bundle to HIGH.',
-          'If both scores are LOW, classify as LOW; otherwise classify as MODERATE.',
-          'Use discharge status text (Ready vs Planning) to set discharge_readiness.'
-        ];
-      } else if (stepId === 'step2') {
-        payload = {
-          patient_id: pid,
-          encounter_id: 'ENC' + pid.slice(1),
-          reconciliation: {
-            continued: ['Frusemide'],
-            stopped: [],
-            started: ['Education pack'],
-            changed: []
-          },
-          safety_flags: ['High-risk medicines require counselling (mock).'],
-          education_points: ['We will give you written information about how and when to take your heart and lung medicines.']
-        };
-        payload.llm_reasoning = [
-          'Compare home, in-hospital and proposed discharge medicines.',
-          'Classify meds as continued, stopped, started or changed.',
-          'Flag high-risk medicines that need explicit counselling.',
-          'Generate short, patient-friendly education points.'
-        ];
-      } else if (stepId === 'step3') {
-        payload = {
-          patient_id: pid,
-          encounter_id: 'ENC' + pid.slice(1),
-          required_followups: [
-            {
-              type: 'GP',
-              reason: 'Post-discharge review',
-              recommended_timeframe: 'within 7 days',
-              status: 'ALREADY_SCHEDULED',
-              scheduled_details: {}
-            }
+          hospital_risk_level: p.hospRisk
+        },
+        prompt_pack: promptCtx
+      };
+
+      // Hint to backend about the specific agent/intent for this step
+      if (stepId === 'step1') basePayload.agent = 'discharge_readiness_risk';
+      else if (stepId === 'step2') basePayload.agent = 'medication_reconciliation';
+      else if (stepId === 'step3') basePayload.agent = 'followup_orchestration';
+      else if (stepId === 'step4') basePayload.agent = 'gp_community_handoff';
+      else if (stepId === 'step5') basePayload.agent = 'post_discharge_monitoring';
+      else if (stepId === 'step6') basePayload.agent = 'outcomes_analytics';
+
+      const data = await runHealthAgent(kind, basePayload, { append: !!window.__appendMode });
+
+      // Prefer backend-provided reasoning if available; otherwise fall back to a simple explanation
+      if (data && Array.isArray(data.llm_reasoning)) {
+        renderHdLogic(stepId, data);
+      } else {
+        const fallback = {
+          llm_reasoning: [
+            'Backend did not return explicit llm_reasoning; showing payload-based context only.'
           ]
         };
-        payload.llm_reasoning = [
-          'Use discharge context and risk band to determine required follow-ups.',
-          'Check scheduled appointments to see what is already booked.',
-          'Mark remaining requirements as MISSING to be booked.'
-        ];
-      } else if (stepId === 'step4') {
-        payload = {
-          patient_id: pid,
-          encounter_id: 'ENC' + pid.slice(1),
-          gp_handoff: {
-            gp_id: 'GP0001',
-            summary_bullets: ['Hospital stay summary (mock).'],
-            gp_action_items: ['Review discharge meds and follow-up plan.']
-          },
-          community_handoff: []
-        };
-        payload.llm_reasoning = [
-          'Summarise the admission for the GP from diagnoses, procedures and hospital course.',
-          'Turn discharge meds and follow-up plan into clear action items.',
-          'Determine which community services should receive referrals.'
-        ];
-      } else if (stepId === 'step5') {
-        const now = new Date();
-        const in48 = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString();
-        payload = {
-          patient_id: pid,
-          encounter_id: 'ENC' + pid.slice(1),
-          next_check_in: {
-            scheduled_time: in48,
-            channel: 'APP',
-            questions: ['How are your breathing and energy today?']
-          },
-          alerts: []
-        };
-        payload.llm_reasoning = [
-          'Use monitoring plan and risk band to choose the next check-in time and channel.',
-          'Tailor questions to the patient’s condition and risk level.',
-          'Inspect recent responses for deterioration or non-adherence.'
-        ];
-      } else if (stepId === 'step6') {
-        payload = {
-          dashboard_period: {
-            start_date: '2025-11-01',
-            end_date: '2025-11-30'
-          },
-          kpis: {
-            readmission_30d_rate: 0.18,
-            gp_followup_7d_completion: 0.72,
-            med_reconciliation_completion: 0.88,
-            avg_los_days: 5.4,
-            baseline_avg_los_days: 6.2
-          },
-          insights: ['This patient contributes to the current discharge cohort (mock).']
-        };
-        payload.llm_reasoning = [
-          'Aggregate outcomes for the dashboard period from OUTCOME_METRICS.',
-          'Compute readmission rate, GP follow-up completion and med reconciliation completion.',
-          'Compare LOS against baseline and surface high-level insights.'
-        ];
+        renderHdLogic(stepId, fallback);
       }
-
-      if (!payload) return;
-      writeResults(kind, payload, !!window.__appendMode);
-      renderHdLogic(stepId, payload);
       window.__appendMode = true;
-      showToast('Executed Hospital Discharge ' + stepId + ' agent (demo).');
+      showToast('Executed Hospital Discharge ' + stepId + ' agent.');
     }
 
     function renderHdLogic(stepId, payload) {
@@ -2048,8 +1992,64 @@ ASSISTANT:
                  (b.eta_min ? `<p>ETA: ${b.eta_min} min</p>` : '') +
                  (b.driver?.name ? `<p>Driver: ${b.driver.name} (${b.driver.rating||''})</p>` : '');
         }
+
+        // Hospital Discharge steps: narrate JSON result in natural language
+        if (kind && kind.startsWith('hd_step') && data) {
+          const res = data.result || data;
+          const pid = res.patient_id || data.patient_id || 'this patient';
+          const agent = res.agent || data.agent || '';
+          const risk = res.overall_risk_band || res.risk_band || res.risk?.overall || data.risk?.overall_risk_band;
+          const bundle = res.recommended_bundle || res.bundle || '';
+          const v = (x, fallback) => (x === undefined || x === null || x === '') ? fallback : x;
+
+          let intro = '';
+          if (kind === 'hd_step1') {
+            intro = `The Discharge Readiness & Risk agent has assessed patient <code>${pid}</code>. ` +
+                    `It classifies their overall discharge risk as <strong>${v(risk,'UNKNOWN')}</strong>` +
+                    (bundle ? ` and recommends the <strong>${bundle}</strong> discharge bundle.` : '.');
+          } else if (kind === 'hd_step2') {
+            const recon = res.reconciliation || {};
+            const cont = (recon.continued || []).length;
+            const started = (recon.started || []).length;
+            const stopped = (recon.stopped || []).length;
+            intro = `The Medication Reconciliation agent has compared home, in-hospital, and proposed discharge medicines for <code>${pid}</code>. ` +
+                    `It will continue <strong>${cont}</strong> medicine(s), start <strong>${started}</strong>, and stop <strong>${stopped}</strong>, highlighting important education points for the patient.`;
+          } else if (kind === 'hd_step3') {
+            const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
+            const missing = fups.filter(f => f.status === 'MISSING').length;
+            const scheduled = fups.filter(f => f.status === 'ALREADY_SCHEDULED').length;
+            intro = `The Follow-Up Orchestration agent has reviewed which appointments <code>${pid}</code> needs after discharge. ` +
+                    `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.`;
+          } else if (kind === 'hd_step4') {
+            const gp = res.gp_handoff || {};
+            const bullets = Array.isArray(gp.summary_bullets) ? gp.summary_bullets.length : 0;
+            const actions = Array.isArray(gp.gp_action_items) ? gp.gp_action_items.length : 0;
+            intro = `The GP & Community Handoff agent has generated a structured handover for patient <code>${pid}</code>. ` +
+                    `It includes <strong>${bullets}</strong> key summary point(s) and <strong>${actions}</strong> action item(s) for the GP and community services.`;
+          } else if (kind === 'hd_step5') {
+            const nc = res.next_check_in || {};
+            const ch = nc.channel || 'APP';
+            const qs = Array.isArray(nc.questions) ? nc.questions.length : 0;
+            intro = `The Post-Discharge Monitoring agent has planned the next check-in for <code>${pid}</code>. ` +
+                    `It proposes a <strong>${ch}</strong> check-in with <strong>${qs}</strong> tailored question(s) and will raise alerts if concerning responses appear.`;
+          } else if (kind === 'hd_step6') {
+            const period = res.dashboard_period || {};
+            const start = period.start_date || 'the current period';
+            const kpis = res.kpis || {};
+            intro = `The Outcomes & Governance Analytics agent has updated cohort metrics for patient <code>${pid}</code> over <strong>${start}</strong> to <strong>${period.end_date || ''}</strong>. ` +
+                    `It summarises readmission, follow-up completion, medication reconciliation, and length-of-stay performance for this discharge program.`;
+          }
+
+          const prettyStep = (() => { try { return JSON.stringify(res, null, 2); } catch { return String(res); } })();
+          return `<p>${intro}</p><p><strong>Underlying JSON result:</strong></p>` +
+                 `<pre style="white-space:pre-wrap; background:#f9fafb; border-radius:4px; padding:6px;">${prettyStep}</pre>`;
+        }
       } catch {}
-      return '<p>Result available.</p>';
+      const safe = (data !== undefined) ? data : null;
+      const pretty = (() => {
+        try { return JSON.stringify(safe, null, 2); } catch { return String(safe); }
+      })();
+      return `<p><strong>Result:</strong></p><pre style="white-space:pre-wrap; background:#f9fafb; border-radius:4px; padding:6px;">${pretty}</pre>`;
     }
 
     function formatCooResult(kind, data) {
