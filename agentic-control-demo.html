@@ -1691,7 +1691,15 @@ ASSISTANT:
       window.__hdSelectedPatientId = p ? p.patientId : null;
       const selEl = document.getElementById('hd_selected_patient');
       const stepsEl = document.getElementById('hd_step_cards');
+      const llmEl = document.getElementById('hd_llm_logic');
+      const resJsonEl = document.getElementById('ha_result_json');
+      const resTextEl = document.getElementById('ha_result_text');
       if (!selEl || !stepsEl) return;
+      // When a new patient is selected, clear any previous agent results and
+      // decision logic so the panels reflect only runs for the current patient.
+      if (llmEl) llmEl.textContent = '';
+      if (resJsonEl) resJsonEl.textContent = '';
+      if (resTextEl) resTextEl.innerHTML = '';
       if (!p) {
         selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
         stepsEl.innerHTML = '';
@@ -1701,6 +1709,11 @@ ASSISTANT:
 
       const riskLabel = (p.laceRisk === 'HIGH' || p.hospRisk === 'HIGH') ? 'HIGH' : (p.laceRisk === 'LOW' && p.hospRisk === 'LOW' ? 'LOW' : 'MODERATE');
       const riskCls = riskLabel === 'HIGH' ? 'pill err' : (riskLabel === 'MODERATE' ? 'pill warn' : 'pill ok');
+
+      const progMap = window.__hdProgress || {};
+      const stepDone = progMap[p.patientId] || 0;
+      const step2StatusLabel = stepDone >= 2 ? 'Completed' : 'Pending';
+      const step2StatusClass = stepDone >= 2 ? 'pill ok' : 'pill warn';
 
       const steps = [
         {
@@ -1714,22 +1727,22 @@ ASSISTANT:
         {
           id:'step2',
           title:'Step 2 • Med Reconciliation',
-          body:'<p>Status: <span class="pill ok">Completed (mock)</span></p><p>Discrepancies: 1–2 typical per patient. Open generated PDF pack from the Medication Reconciliation Agent in the real console.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step2\')">Run Step 2 Agent</button></div>'
+          body:`<p>Status: <span class="${step2StatusClass}">${step2StatusLabel}</span></p><p>Discrepancies: 1–2 typical per patient. Open generated PDF pack from the Medication Reconciliation Agent in the real console.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep('step2')">Run Step 2 Agent</button></div>`
         },
         {
           id:'step3',
           title:'Step 3 • Follow-Up',
-          body:'<p>GP and specialist appointments scheduled (mock).</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step3\')">Run Step 3 Agent</button></div>'
+          body:'<p>GP and specialist appointments scheduled.</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step3\')">Run Step 3 Agent</button></div>'
         },
         {
           id:'step4',
           title:'Step 4 • GP & Community Handoff',
-          body:'<p>GP summary sent (mock). Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step4\')">Run Step 4 Agent</button></div>'
+          body:'<p>GP summary sent. Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step4\')">Run Step 4 Agent</button></div>'
         },
         {
           id:'step5',
           title:'Step 5 • Monitoring',
-          body:`<p>Day 1–30 avatar check-ins configured (mock). High-risk patients like ${p.name} would receive tighter monitoring.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep('step5')">Run Step 5 Agent</button></div>`
+          body:`<p>Day 1–30 avatar check-ins configured. High-risk patients like ${p.name} would receive tighter monitoring.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep('step5')">Run Step 5 Agent</button></div>`
         },
         {
           id:'step6',
@@ -2123,9 +2136,35 @@ ASSISTANT:
               }
             } catch (e) {}
 
+            // If the agent has turned a missing mental health follow-up into an
+            // ALREADY_SCHEDULED appointment with a Task, surface that booking
+            // explicitly including date/time when available.
+            let bookingLine = '';
+            try {
+              const firstScheduled = fups.find(f => f.status === 'ALREADY_SCHEDULED') || null;
+              let when = '';
+              if (firstScheduled && firstScheduled.recommended_timeframe) {
+                when = firstScheduled.recommended_timeframe;
+              } else if (appts.length && appts[0].date) {
+                when = appts[0].date;
+              }
+              if (firstScheduled) {
+                const t = firstScheduled.type || 'follow-up appointment';
+                const reason = firstScheduled.reason || '';
+                const taskId = firstScheduled.task_id || '';
+                let sentence = ` A <strong>${t}</strong> has been booked`;
+                if (when) sentence += ` for <strong>${when}</strong>`;
+                if (reason) sentence += ` because: ${reason}`;
+                if (taskId) sentence += ` (Task ID: ${taskId}).`;
+                else sentence += '.';
+                bookingLine = `<p>${sentence}</p>`;
+              }
+            } catch (e) {}
+
             intro = `The Follow-Up Orchestration agent has reviewed which appointments <code>${pid}</code> needs after discharge. ` +
                     `It identifies <strong>${scheduled}</strong> appointment(s) already scheduled and <strong>${missing}</strong> still to be booked.` +
                     (apptLines ? `<p><strong>Follow-up appointments:</strong><br/>${apptLines}</p>` : '') +
+                    bookingLine +
                     safetyLine;
           } else if (kind === 'hd_step4') {
             const gp = res.gp_handoff || {};
@@ -2180,8 +2219,30 @@ ASSISTANT:
             const period = res.dashboard_period || {};
             const start = period.start_date || 'the current period';
             const kpis = res.kpis || {};
+            // Turn KPI object into human-readable bullet list
+            const lines = [];
+            const mapLabel = key => {
+              const lower = key.toLowerCase();
+              if (lower.includes('readmission')) return '30-day readmission rate';
+              if (lower.includes('follow') && lower.includes('7')) return 'GP follow-up within 7 days';
+              if (lower.includes('med') && lower.includes('recon')) return 'Medication reconciliation completion';
+              if (lower.includes('los') || lower.includes('length_of_stay')) return 'Average length of stay';
+              return key;
+            };
+            Object.keys(kpis || {}).forEach(k => {
+              const label = mapLabel(k);
+              const v = kpis[k];
+              if (v !== undefined && v !== null && v !== '') {
+                lines.push(`• ${label}: ${v}`);
+              }
+            });
+            const kpiHtml = lines.length
+              ? `<p><strong>Key performance indicators for this discharge program:</strong><br/>${lines.join('<br/>')}</p>`
+              : '';
+
             intro = `The Outcomes & Governance Analytics agent has updated cohort metrics for patient <code>${pid}</code> over <strong>${start}</strong> to <strong>${period.end_date || ''}</strong>. ` +
-                    `It summarises readmission, follow-up completion, medication reconciliation, and length-of-stay performance for this discharge program.`;
+                    `It summarises readmission, follow-up completion, medication reconciliation, and length-of-stay performance for this discharge program.` +
+                    kpiHtml;
           }
 
           return `<p>${intro}</p>`;

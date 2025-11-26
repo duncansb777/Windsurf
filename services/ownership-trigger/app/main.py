@@ -515,6 +515,15 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             )
             executed["tasks"].append({"input": fup, "result": task_res})
 
+            # Reflect execution back into the follow-up object so the JSON and
+            # UI can treat it as scheduled rather than still missing.
+            try:
+                fup["status"] = "ALREADY_SCHEDULED"
+                if isinstance(task_res, dict) and task_res.get("id"):
+                    fup["task_id"] = task_res["id"]
+            except Exception:
+                pass
+
         data: dict = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "followup_orchestration",
@@ -587,23 +596,55 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         gp = body.get("gp_handoff") or {}
         gp_actions = gp.get("gp_action_items") or []
 
+        # Enrich with EMR GP information and diagnosis/risk where available.
+        csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+        gp_rows = csv_ctx.get("gp_information") or []
+        diag_rows = csv_ctx.get("diagnosis") or []
+        risk_lace_rows = csv_ctx.get("risk_lace_plus") or []
+        risk_hosp_rows = csv_ctx.get("risk_hospital") or []
+
+        # If the LLM did not provide summary bullets, derive a simple discharge
+        # summary from diagnosis and risk scores so the GP sees key context.
+        if not gp.get("summary_bullets"):
+            bullets: list[str] = []
+            if diag_rows:
+                d0 = diag_rows[0]
+                desc = d0.get("DESCRIPTION") or "Primary diagnosis"
+                code = d0.get("CODE") or ""
+                bullets.append(f"Primary diagnosis: {desc}{' (' + code + ')' if code else ''}.")
+            if risk_lace_rows:
+                bullets.append("Elevated LACE+ readmission risk for this discharge.")
+            if risk_hosp_rows:
+                bullets.append("Hospital score indicates higher in-hospital risk factors.")
+            if not bullets:
+                bullets.append("Hospital discharge with chronic condition follow-up required.")
+            gp.setdefault("summary_bullets", bullets)
+
         # If the LLM did not propose any GP action items but a GP follow-up
         # appears required and provider context exists, synthesise a simple
         # GP follow-up action so the demo always shows one.
         try:
             if not gp_actions:
                 followup_required = body.get("gp_followup_required")
+                # Prefer GP details from EHR_GP_INFORMATION; fall back to
+                # provider directory only if needed.
+                gp_name = None
+                if gp_rows:
+                    g0 = gp_rows[0]
+                    gp_name = g0.get("GP_NAME") or None
+
                 providers = mcp_context.get("providers") if isinstance(mcp_context, dict) else None
                 prov_list = []
                 if isinstance(providers, dict) and isinstance(providers.get("providers"), list):
                     prov_list = providers["providers"]
-                if (followup_required is True or followup_required is None) and prov_list:
-                    primary = prov_list[0] or {}
+
+                if (followup_required is True or followup_required is None) and (gp_name or prov_list):
                     desc = "GP follow-up appointment after discharge"
+                    provider_label = gp_name or (prov_list[0].get("name") or prov_list[0].get("id") if prov_list else "GP")
                     gp_actions = [
                         {
                             "description": desc,
-                            "provider": primary.get("name") or primary.get("id") or "GP",
+                            "provider": provider_label,
                             "status": "PLANNED",
                         }
                     ]
