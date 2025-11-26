@@ -407,73 +407,72 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
 
         recon = body.get("reconciliation") or {}
 
-        # Normalise LLM reconciliation lists
-        cont = recon.get("continued") or []
-        started = recon.get("started") or []
-        stopped = recon.get("stopped") or []
+        # Education points may be suggested by the LLM; we always derive the
+        # structural reconciliation (continued/started/stopped) from EMR CSVs
+        # so the EMR is the single source of truth for medication changes.
         edu = recon.get("education_points") or []
 
-        # If the LLM did not populate any reconciliation decisions, fall back to
-        # a simple CSV-based derivation so the demo always reflects meds
-        # explicitly listed for this patient across home, inpatient, and
-        # discharge medication CSVs.
-        if not (cont or started or stopped):
-            try:
-                csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
-                home_rows = csv_ctx.get("home_meds") or []
-                inpatient_rows = csv_ctx.get("inpatient_meds") or []
-                discharge_rows = csv_ctx.get("discharge_meds") or []
+        try:
+            csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
+            home_rows = csv_ctx.get("home_meds") or []
+            inpatient_rows = csv_ctx.get("inpatient_meds") or []
+            discharge_rows = csv_ctx.get("discharge_meds") or []
 
-                def _med_from_row(r: dict, source: str) -> dict:
-                    return {
-                        "source": source,
-                        "medication_name": r.get("MEDICATION_NAME") or r.get("MED_NAME") or "Medication",
-                        "dose": r.get("DOSE") or r.get("STRENGTH") or "",
-                        "route": r.get("ROUTE") or "",
-                        "frequency": r.get("FREQUENCY") or "",
-                        "status": r.get("STATUS") or "ACTIVE",
-                    }
+            def _med_from_row(r: dict, source: str) -> dict:
+                return {
+                    "source": source,
+                    "medication_name": r.get("MEDICATION_NAME") or r.get("MED_NAME") or "Medication",
+                    "dose": r.get("DOSE") or r.get("STRENGTH") or "",
+                    "route": r.get("ROUTE") or "",
+                    "frequency": r.get("FREQUENCY") or "",
+                    "status": r.get("STATUS") or "ACTIVE",
+                }
 
-                def _key(r: dict) -> str:
-                    # Use a simple case-insensitive name key for grouping
-                    return (r.get("MEDICATION_NAME") or r.get("MED_NAME") or "").strip().lower()
+            def _key(r: dict) -> str:
+                # Use a simple case-insensitive name key for grouping
+                return (r.get("MEDICATION_NAME") or r.get("MED_NAME") or "").strip().lower()
 
-                home_by_name = {_key(r): r for r in home_rows if _key(r)}
-                discharge_by_name = {_key(r): r for r in discharge_rows if _key(r)}
+            home_by_name = {_key(r): r for r in home_rows if _key(r)}
+            discharge_by_name = {_key(r): r for r in discharge_rows if _key(r)}
 
-                # Continued: appears in both home and discharge
-                cont = []
-                for name, row in home_by_name.items():
-                    if name in discharge_by_name:
-                        cont.append(_med_from_row(discharge_by_name[name], "discharge"))
+            # Continued: appears in both home and discharge
+            cont = []
+            for name, row in home_by_name.items():
+                if name in discharge_by_name:
+                    cont.append(_med_from_row(discharge_by_name[name], "discharge"))
 
-                # Started: in discharge but not in home
-                started = []
-                for name, row in discharge_by_name.items():
-                    if name not in home_by_name:
-                        started.append(_med_from_row(row, "discharge"))
+            # Started: in discharge but not in home
+            started = []
+            for name, row in discharge_by_name.items():
+                if name not in home_by_name:
+                    started.append(_med_from_row(row, "discharge"))
 
-                # Stopped: in home but not on discharge
-                stopped = []
-                for name, row in home_by_name.items():
-                    if name not in discharge_by_name:
-                        stopped.append(_med_from_row(row, "home"))
+            # Stopped: in home but not on discharge
+            stopped = []
+            for name, row in home_by_name.items():
+                if name not in discharge_by_name:
+                    stopped.append(_med_from_row(row, "home"))
 
-                # If there are no discharge rows at all, treat home meds as
-                # continued so the demo still shows something sensible.
-                if not discharge_rows and home_rows and not cont and not started and not stopped:
-                    cont = [_med_from_row(r, "home") for r in home_rows]
+            # If there are no discharge rows at all, treat home meds as
+            # continued so the demo still shows something sensible.
+            if not discharge_rows and home_rows and not cont and not started and not stopped:
+                cont = [_med_from_row(r, "home") for r in home_rows]
 
-                # Add a generic education point for any high-risk-looking meds
-                base_rows = discharge_rows or home_rows or inpatient_rows
-                if base_rows and not edu:
-                    names = " ".join([r.get("MEDICATION_NAME", "") for r in base_rows]).lower()
-                    if any(k in names for k in ["insulin", "prednisolone", "warfarin", "opioid", "morphine"]):
-                        edu = [
-                            "Reinforce sick-day rules and hypoglycaemia/side-effect monitoring for high-risk medicines.",
-                        ]
-            except Exception:
-                pass
+            # Add a generic education point for any high-risk-looking meds if the
+            # LLM did not already specify any.
+            base_rows = discharge_rows or home_rows or inpatient_rows
+            if base_rows and not edu:
+                names = " ".join([r.get("MEDICATION_NAME", "") for r in base_rows]).lower()
+                if any(k in names for k in ["insulin", "prednisolone", "warfarin", "opioid", "morphine"]):
+                    edu = [
+                        "Reinforce sick-day rules and hypoglycaemia/side-effect monitoring for high-risk medicines.",
+                    ]
+        except Exception:
+            # If CSV context is unavailable, fall back to whatever the LLM
+            # provided for the structural reconciliation lists.
+            cont = recon.get("continued") or []
+            started = recon.get("started") or []
+            stopped = recon.get("stopped") or []
 
         data = {
             "patient_id": req.patient_id or pid,
