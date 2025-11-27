@@ -1002,8 +1002,11 @@ language field simple_description that:
 - briefly describes what the medication is for, AND
 - summarises the top 3 patient-relevant risks or monitoring points.
 
-When policies do not request this extra detail, you may omit simple_description
-and focus on the structural reconciliation and education_points instead.
+If any active policy explicitly says that per-med descriptions should not be
+shown (for example, a line such as "do not display simple_description" or
+"do not include per-med descriptions"), then you MUST NOT emit the
+simple_description field at all for any medication. In that case, focus only
+on the structural reconciliation and education_points instead.
 
 CONTEXT:
 - Home medications before admission:
