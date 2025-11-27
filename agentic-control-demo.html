@@ -996,13 +996,14 @@ You must:
 - Flag high-risk medicines explicitly (e.g., anticoagulants, insulin, opioids).
 - Avoid changing orders yourself – you only RECOMMEND and EXPLAIN.
 
-For the final discharge medication list you output, you MUST, for each medication,
-provide a short natural language field simple_description that:
+When the active policies request per-med explanations or risks, you SHOULD, for
+each medication in the final discharge list you output, include a short natural
+language field simple_description that:
 - briefly describes what the medication is for, AND
 - summarises the top 3 patient-relevant risks or monitoring points.
 
-This simple_description field is used directly in the clinician and patient-facing
-natural language output. Keep it to one or two sentences, plain language.
+When policies do not request this extra detail, you may omit simple_description
+and focus on the structural reconciliation and education_points instead.
 
 CONTEXT:
 - Home medications before admission:
@@ -1031,8 +1032,11 @@ ASSISTANT:
 3) Create patient-friendly education points (short, simple language):
    - 1–3 bullets per high-risk or clinically important medicine.
 
-4) Output strict JSON only, where reconciliation lists are arrays of medication
-   OBJECTS, not bare strings, and each object includes simple_description:
+4) Output strict JSON only. When you include richer per-med explanations, emit
+   reconciliation lists as arrays of medication OBJECTS (not bare strings) and
+   attach simple_description as shown below. When you do not include per-med
+   explanations, you may omit simple_description or keep lists as simpler
+   objects, but stay JSON-valid:
 
 {
   "patient_id": "<PATIENT_ID>",
@@ -2654,21 +2658,13 @@ ASSISTANT:
               return bits.join(' · ');
             }
 
-            function medLine(m) {
-              const base = `• ${medLabel(m)}`;
-              const desc = m.simple_description || m.description || '';
-              if (!desc) return base;
-              return (
-                base +
-                '<br/>&nbsp;&nbsp;<span style="color:#6b7280; font-size:12px;">' +
-                desc +
-                '</span>'
-              );
-            }
-
-            const contList = contArr.map(medLine).join('<br/>');
-            const startedList = startedArr.map(medLine).join('<br/>');
-            const stoppedList = stoppedArr.map(medLine).join('<br/>');
+            // Primary bullets stay grounded in the EMR-derived reconciliation
+            // lists. Any richer narrative the LLM generates is shown in a
+            // separate section below so policies can freely change it without
+            // us over-constraining the structure here.
+            const contList = contArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            const startedList = startedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            const stoppedList = stoppedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
 
             // Surface high-risk medicines explicitly, aligned with Prompt Studio
             // policy: "Always flag high-risk medicines (anticoagulants, insulin,
@@ -2687,13 +2683,33 @@ ASSISTANT:
               ? `<p><strong>Education and counselling points:</strong><br/>${eduPoints.map(e => `• ${e}`).join('<br/>')}</p>`
               : '';
 
+            // Surface any richer, policy-driven narrative that the LLM
+            // produced. We prefer a dedicated summary field if present, then
+            // fall back to education points or llm_reasoning.
+            const planRaw = res.plan_raw || {};
+            const llmSummary = planRaw.patient_friendly_summary || planRaw.summary_text || '';
+            const llmReasoningArr = Array.isArray(res.llm_reasoning) ? res.llm_reasoning : [];
+            const hasReasoning = llmReasoningArr.length > 0;
+
+            let llmNarrativeHtml = '';
+            if (llmSummary) {
+              llmNarrativeHtml = `<p><strong>LLM narrative (policy-driven):</strong> ${llmSummary}</p>`;
+            } else if (eduPoints.length) {
+              // Already shown as bullets above; here we just flag that these
+              // came from the LLM following the active policies.
+              llmNarrativeHtml = `<p><strong>LLM narrative (from policies):</strong> The following education points were generated using the current Medication Reconciliation policies.</p>`;
+            } else if (hasReasoning) {
+              llmNarrativeHtml = `<p><strong>LLM reasoning (from policies):</strong><br/>${llmReasoningArr.map(l => `• ${l}`).join('<br/>')}</p>`;
+            }
+
             intro = `The Medication Reconciliation agent has compared home, in-hospital, and proposed discharge medicines for <code>${pid}</code>. ` +
                     `It will continue <strong>${cont}</strong> medicine(s), start <strong>${started}</strong>, and stop <strong>${stopped}</strong>, highlighting important education points for the patient.` +
                     (contList ? `<p><strong>Continued medicines:</strong><br/>${contList}</p>` : '') +
                     (startedList ? `<p><strong>New medicines to start:</strong><br/>${startedList}</p>` : '') +
                     (stoppedList ? `<p><strong>Medicines to stop:</strong><br/>${stoppedList}</p>` : '') +
                     (highRiskLines ? `<p><strong>High-risk medicines flagged for explicit counselling (per policy):</strong><br/>${highRiskLines}</p>` : '') +
-                    eduHtml;
+                    eduHtml +
+                    llmNarrativeHtml;
           } else if (kind === 'hd_step3') {
             const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
             let missing = fups.filter(f => f.status === 'MISSING').length;
