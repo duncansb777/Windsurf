@@ -392,6 +392,11 @@
         </div>
       </div>
     </div>
+    <div id="hd_policies_llm" class="card" style="margin-top:10px; background:#f9fafb; border-radius:8px; border:1px solid var(--border); padding:8px;">
+      <h4 style="margin:4px 0 6px;">Active Policies &amp; LLM Output</h4>
+      <p style="color:var(--muted); font-size:12px; margin-top:-4px;">After you run a Hospital Discharge step, this panel shows which Prompt Studio pack, instructions, and policies were submitted to the LLM, together with key raw LLM fields returned for that run.</p>
+      <div id="hd_policies_llm_body" style="font-size:12px; color:#111827; line-height:1.5;"></div>
+    </div>
   </section>
 
     <!-- Screen 2: Escalations Inbox -->
@@ -889,7 +894,7 @@
         desc: 'High-level prompts to apply Australian health privacy regulations across Health agents.',
         affects: 'All Health Agents',
         instructions: 'Placeholder summary of APP 6/11, state Health Records Acts, and data minimisation guardrails.',
-        policies: `- Apply Australian health privacy regulations (APP 6/11, state Health Records Acts) to all clinical and billing data.\n- Limit use and disclosure of identifiable data to the minimum necessary for care, payment or operations.\n- Do not use this environment for model training or analytics without explicit consent and governance approval.`,
+        policies: `- Apply Australian health privacy regulations (APP 6/11, state Health Records Acts) to all clinical and billing data.\n- Limit use and disclosure of identifiable data to the minimum necessary for care, payment or operations.\n- Do not use patient data from this environment for model training or analytics without explicit consent and governance approval.`,
         examples: [
           { scenario:'Use discharge data for care coordination', status:'Passed', last_run:'Today' },
           { scenario:'Share data for model training without consent', status:'Blocked', last_run:'Today' }
@@ -2217,12 +2222,14 @@ ASSISTANT:
       const resJsonEl = document.getElementById('ha_result_json');
       const resTextEl = document.getElementById('ha_result_text');
       const graphEl = document.getElementById('ha_graph');
+      const polEl = document.getElementById('hd_policies_llm_body');
       if (!selEl || !stepsEl) return;
       // When a new patient is selected, clear any previous agent results and
       // decision logic so the panels reflect only runs for the current patient.
       if (llmEl) llmEl.textContent = '';
       if (resJsonEl) resJsonEl.textContent = '';
       if (resTextEl) resTextEl.innerHTML = '';
+      if (polEl) polEl.innerHTML = '';
       if (graphEl) graphEl.innerHTML = '';
       if (!p) {
         selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
@@ -2256,12 +2263,12 @@ ASSISTANT:
         {
           id:'step3',
           title:'Step 3 • Follow-Up',
-          body:'<p>GP and specialist appointments scheduled.</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step3\')">Run Step 3 Agent</button></div>'
+          body:'<p>GP and specialist appointments scheduled.</p><p>Click-through in the real console would show booked dates, completion and no-show flags.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step3\')">Run Step 3 Agent</button></div>`
         },
         {
           id:'step4',
           title:'Step 4 • GP & Community Handoff',
-          body:'<p>GP summary sent. Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step4\')">Run Step 4 Agent</button></div>'
+          body:'<p>GP summary sent. Community referrals depend on risk bundle (HIGH risk → full services; LOW risk → slimmed set).</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step4\')">Run Step 4 Agent</button></div>`
         },
         {
           id:'step5',
@@ -2271,7 +2278,7 @@ ASSISTANT:
         {
           id:'step6',
           title:'Step 6 • Outcomes',
-          body:'<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step6\')">Run Step 6 Agent</button></div>'
+          body:'<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p><div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step6\')">Run Step 6 Agent</button></div>`
         }
       ];
 
