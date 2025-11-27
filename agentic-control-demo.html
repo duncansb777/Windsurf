@@ -120,6 +120,21 @@
       </footer>
     </div>
   </div>
+
+  <!-- Follow-Up Booking Modal (Step 3) -->
+  <div id="followupBookingModal" class="modal-backdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <header class="row" style="justify-content: space-between;">
+        <strong>Book Follow-Up Appointments</strong>
+        <button class="btn" onclick="closeModal('followupBookingModal')">Close</button>
+      </header>
+      <div id="followupBookingBody" style="max-height:60vh; overflow:auto; padding-top:8px;"></div>
+      <footer>
+        <button class="btn" onclick="closeModal('followupBookingModal')">Cancel</button>
+        <button class="btn primary" onclick="confirmFollowupBookings()">Confirm Bookings</button>
+      </footer>
+    </div>
+  </div>
     <div id="nav">
       <button class="btn" data-view="fleet">Fleet</button>
       <button class="btn" data-view="escalations">Escalations</button>
@@ -1878,6 +1893,14 @@ ASSISTANT:
 
       const data = await runHealthAgent(kind, basePayload, { append: !!window.__appendMode });
 
+      // For step 3, surface the follow-up booking flow so a user can
+      // interactively choose concrete appointment slots where needed.
+      if (stepId === 'step3' && data) {
+        try {
+          openFollowupBookingModal(pid, data);
+        } catch (e) {}
+      }
+
       // Prefer backend-provided reasoning if available; otherwise fall back to a simple explanation
       if (data && Array.isArray(data.llm_reasoning)) {
         renderHdLogic(stepId, data);
@@ -2478,6 +2501,165 @@ ASSISTANT:
       } catch (e) {
         return '<p>CoO result available.</p>';
       }
+    }
+
+    // ---- Follow-up booking helpers (Step 3) ----
+
+    function openFollowupBookingModal(patientId, stepData) {
+      const res = stepData.result || stepData;
+      const fups = Array.isArray(res.required_followups) ? res.required_followups : [];
+
+      // Consider any follow-up that is not already scheduled as needing a
+      // booking interaction.
+      const needing = fups.filter(f => (f.status || '').toUpperCase() !== 'ALREADY_SCHEDULED');
+      if (!needing.length) return; // nothing to book
+
+      const bodyEl = document.getElementById('followupBookingBody');
+      if (!bodyEl) return;
+
+      const encId = res.encounter_id || ('ENC' + String(patientId || '').slice(1));
+      const items = needing.map((f, idx) => ({
+        idx,
+        type: f.type || 'appointment',
+        provider_id: f.provider_id || '',
+        reason: f.reason || '',
+        recommended_timeframe: f.recommended_timeframe || ''
+      }));
+
+      window.__followupBookingCtx = {
+        patientId,
+        encounterId: encId,
+        items
+      };
+
+      const today = new Date().toISOString().slice(0, 10);
+      const sections = items.map(item => {
+        const idSuffix = String(item.idx);
+        const tf = item.recommended_timeframe ? ` (recommended: ${item.recommended_timeframe})` : '';
+        return `
+          <div class="card" style="margin-bottom:8px;">
+            <h4 style="margin:4px 0 6px;">${item.type}</h4>
+            <p style="font-size:12px; color:var(--muted);">${item.reason || 'Follow-up required.'}${tf}</p>
+            <div class="row" style="margin-bottom:6px;">
+              <div style="flex:1;">
+                <label>Choose date</label>
+                <input type="date" id="followup_date_${idSuffix}" value="${today}" onchange="onFollowupDateChange(${item.idx})" />
+              </div>
+            </div>
+            <div>
+              <label>Available 15-minute slots</label>
+              <div id="followup_slots_${idSuffix}" class="row" style="flex-wrap:wrap; gap:4px; font-size:12px;"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      bodyEl.innerHTML = sections;
+
+      // Preload slots for each follow-up using today's date
+      items.forEach(item => {
+        try { onFollowupDateChange(item.idx); } catch (e) {}
+      });
+
+      openModal('followupBookingModal');
+    }
+
+    async function onFollowupDateChange(idx) {
+      const ctx = window.__followupBookingCtx;
+      if (!ctx) return;
+      const item = ctx.items.find(i => i.idx === idx);
+      if (!item) return;
+      const dateEl = document.getElementById('followup_date_' + idx);
+      const slotsEl = document.getElementById('followup_slots_' + idx);
+      if (!dateEl || !slotsEl) return;
+      const date = dateEl.value || new Date().toISOString().slice(0, 10);
+
+      slotsEl.innerHTML = '<span style="font-size:12px; color:var(--muted);">Loading slots…</span>';
+
+      try {
+        const resp = await fetch('/demo/followups/slots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient_id: ctx.patientId,
+            appointment_type: item.type,
+            provider_id: item.provider_id || undefined,
+            date
+          })
+        });
+        const data = await resp.json();
+        const slots = Array.isArray(data.slots) ? data.slots : [];
+        if (!slots.length) {
+          slotsEl.innerHTML = '<span style="font-size:12px; color:var(--muted);">No slots available for this day.</span>';
+          return;
+        }
+
+        slotsEl.innerHTML = '';
+        slots.forEach(s => {
+          const d = new Date(s.start);
+          const label = isNaN(d.getTime())
+            ? s.start
+            : d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn';
+          btn.textContent = label;
+          btn.style.marginBottom = '4px';
+          btn.disabled = !!s.busy;
+          if (s.busy) {
+            btn.classList.add('ghost');
+            btn.style.opacity = '0.5';
+            btn.title = 'Busy';
+          }
+          btn.onclick = () => {
+            // Record selection
+            item.selectedDatetime = s.start;
+            // Visual highlight
+            Array.from(slotsEl.querySelectorAll('button')).forEach(b => b.classList.remove('primary'));
+            btn.classList.add('primary');
+          };
+          slotsEl.appendChild(btn);
+        });
+      } catch (e) {
+        slotsEl.innerHTML = '<span style="font-size:12px; color:var(--err);">Error loading slots.</span>';
+      }
+    }
+
+    async function confirmFollowupBookings() {
+      const ctx = window.__followupBookingCtx;
+      if (!ctx) { closeModal('followupBookingModal'); return; }
+      const toBook = ctx.items
+        .filter(i => i.selectedDatetime)
+        .map(i => ({
+          type: i.type,
+          datetime: i.selectedDatetime,
+          provider_id: i.provider_id || undefined,
+          reason: i.reason || undefined
+        }));
+
+      if (!toBook.length) {
+        showToast('Select at least one slot before confirming.');
+        return;
+      }
+
+      try {
+        const resp = await fetch('/demo/followups/book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patient_id: ctx.patientId,
+            encounter_id: ctx.encounterId,
+            bookings: toBook
+          })
+        });
+        const data = await resp.json();
+        const summary = data.summary_text || 'Follow-up appointments booked.';
+        showToast(summary);
+      } catch (e) {
+        showToast('Error booking follow-up appointments.');
+      }
+
+      closeModal('followupBookingModal');
     }
 
     function focusCard(id) {

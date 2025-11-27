@@ -5,6 +5,7 @@ import os
 import csv
 import time
 import json
+import random
 from typing import Optional, List
 from .ccs_tools import ccs_get_meter_reads
 from .agentis_demo import run_demo as agentis_run_demo
@@ -118,6 +119,187 @@ def demo_agentis(req: AgentisDemoRequest):
 def demo_agentis_referral(req: AgentisDemoRequest):
     pid = req.patient_id or "123"
     return agentis_run_referral(pid, extra_context=(req.context or {}))
+
+
+class SlotRequest(BaseModel):
+    patient_id: str
+    appointment_type: str
+    date: str  # ISO local date, e.g. "2025-11-30"
+    timezone: Optional[str] = "Australia/Sydney"
+
+
+@app.post("/demo/followups/slots")
+def followup_slots(req: SlotRequest):
+    """Return a grid of 15-minute working-day slots with some randomly marked
+    busy for demo purposes.
+
+    This endpoint does not consult real provider calendars; it simply
+    synthesises availability so the UI can render realistic-looking calendars
+    with a mix of free and busy times.
+    """
+
+    from datetime import datetime, time as dtime, timedelta
+
+    # Working day 09:00–17:00 local; 15-minute slots.
+    try:
+        day = datetime.fromisoformat(req.date)
+    except Exception:
+        # Fallback to today if the date is invalid
+        day = datetime.now()
+
+    start_dt = datetime.combine(day.date(), dtime(hour=9, minute=0))
+    end_dt = datetime.combine(day.date(), dtime(hour=17, minute=0))
+    slot_len = timedelta(minutes=15)
+
+    slots = []
+    cur = start_dt
+    # Simple pseudo-random seed based on patient + type + provider + date so
+    # the pattern is stable per patient/provider/day but different across
+    # combinations.
+    prov = getattr(req, "provider_id", None) or ""
+    seed_str = f"{req.patient_id}-{req.appointment_type}-{prov}-{req.date}"
+    rnd = random.Random(seed_str)
+
+    while cur < end_dt:
+        nxt = cur + slot_len
+        # Roughly 30–40% of slots marked busy.
+        busy = rnd.random() < 0.35
+        slots.append({
+            "start": cur.isoformat(),
+            "end": nxt.isoformat(),
+            "busy": busy,
+        })
+        cur = nxt
+
+    return {"slots": slots}
+
+
+class BookingItem(BaseModel):
+    type: str
+    datetime: str
+    provider_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class BookingRequest(BaseModel):
+    patient_id: str
+    encounter_id: Optional[str] = None
+    bookings: list[BookingItem]
+
+
+@app.post("/demo/followups/book")
+def followup_book(req: BookingRequest):
+    """Create EMR-level follow-up appointments for the supplied bookings.
+
+    This endpoint is designed to be called by a generic appointment execution
+    agent or the UI after a human has selected concrete date/times for the
+    required follow-ups.
+    """
+
+    pid = req.patient_id
+    enc_id = req.encounter_id or f"ENC{str(pid)[1:]}"
+
+    appt_csv_path = os.path.join(BASE_DIR, "data", "csv", "FOLLOW_UP_APPOINTMENTS.csv")
+
+    # Ensure CSV exists with header
+    if not os.path.exists(appt_csv_path):
+        with open(appt_csv_path, "w", newline="") as fcsv:
+            w = csv.writer(fcsv)
+            w.writerow([
+                "APPOINTMENT_ID",
+                "PATIENT_ID",
+                "ENCOUNTER_ID",
+                "TYPE",
+                "PROVIDER_ID",
+                "DATE_TIME",
+                "STATUS",
+            ])
+
+    # Load existing rows to avoid naive duplicates for same patient/type/datetime
+    existing = set()
+    try:
+        with open(appt_csv_path, newline="") as fcsv:
+            rdr = csv.DictReader(fcsv)
+            for row in rdr:
+                if row.get("PATIENT_ID") == pid:
+                    key = (row.get("TYPE") or "", row.get("DATE_TIME") or "")
+                    existing.add(key)
+    except Exception:
+        pass
+
+    epic = make_epic_client()
+
+    created: list[dict] = []
+
+    with open(appt_csv_path, "a", newline="") as fcsv:
+        w = csv.writer(fcsv)
+        for item in req.bookings:
+            t = item.type or "appointment"
+            dt_str = item.datetime
+            prov_id = item.provider_id or ""
+            key = (t, dt_str)
+
+            status = "SCHEDULED"
+            already = key in existing
+
+            if not already:
+                appt_id = f"FU-{pid}-{int(time.time())}-{len(created)}"
+                w.writerow([
+                    appt_id,
+                    pid,
+                    enc_id,
+                    t,
+                    prov_id,
+                    dt_str,
+                    status,
+                ])
+                existing.add(key)
+            else:
+                appt_id = None
+
+            # Optionally create a Task in Epic to mirror the booking
+            task_id = None
+            try:
+                desc = item.reason or f"Follow-up: {t}"
+                task_res = epic.call(
+                    "epic.fhir_write_back.create",
+                    {
+                        "resource_type": "Task",
+                        "resource_json": {
+                            "resourceType": "Task",
+                            "status": "requested",
+                            "intent": "order",
+                            "for": {"reference": f"Patient/{pid}"},
+                            "description": desc,
+                        },
+                    },
+                )
+                if isinstance(task_res, dict) and task_res.get("id"):
+                    task_id = task_res["id"]
+            except Exception:
+                pass
+
+            created.append(
+                {
+                    "type": t,
+                    "datetime": dt_str,
+                    "provider_id": prov_id,
+                    "status": "CREATED" if not already else "ALREADY_SCHEDULED",
+                    "appointment_id": appt_id,
+                    "task_id": task_id,
+                    "reason": item.reason,
+                }
+            )
+
+    # Simple narrative summary for UI consumption
+    created_count = sum(1 for a in created if a["status"] == "CREATED")
+    already_count = sum(1 for a in created if a["status"] == "ALREADY_SCHEDULED")
+    summary = (
+        f"Created {created_count} new follow-up appointment(s) and "
+        f"found {already_count} existing appointment(s) for patient {pid}."
+    )
+
+    return {"appointments": created, "summary_text": summary}
 
 
 class PromptPack(BaseModel):
