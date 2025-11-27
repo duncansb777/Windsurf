@@ -383,6 +383,12 @@
             <pre id="ha_result_json" style="white-space:pre-wrap; overflow:auto; max-height:30vh; background:#0b1020; color:#c7e1ff; padding:8px; border-radius:8px;"></pre>
             <div id="ha_result_text" style="font-size:13px; line-height:1.5; color:#1f2937;"></div>
           </div>
+
+          <div style="margin-top:10px;">
+            <h4 style="margin:4px 0 6px;">Agent &amp; Data Flow</h4>
+            <p style="color:var(--muted); font-size:12px; margin-top:-4px;">Each run shows how <strong>many small, purpose-built agents</strong> collaborate with the LLM, EMR CSVs, Epic MCP, and humans, instead of one large agent doing everything.</p>
+            <div id="ha_graph" style="border:1px solid var(--border); border-radius:8px; padding:6px; background:#f9fafb; min-height:40px;"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1428,34 +1434,106 @@ ASSISTANT:
 
     const EXEC_GRAPH_TEMPLATES = {
       discharge: [
-        'Health UI',
-        'Ownership Trigger API (/demo/discharge)',
-        'MCP: Epic (discharge_event, patient_bundle)',
-        'MCP: HCA (directory search)',
-        'LLM Planner / Risk Scoring',
-        'Tasks & Notifications'
+        'Fleet UI',
+        'Agent: Ownership Trigger',
+        'LLM (routing)',
+        'CoO MCP tools',
+        'Ownership Trigger Agent (post-process)',
+        'Billing CSVs',
+        'Human back-office review'
       ],
       agenticReferral: [
-        'Health UI',
-        'Ownership Trigger API (/demo/agentis-referral)',
-        'MCP: Epic (clinical data)',
-        'MCP: HCA (providers & consent)',
-        'LLM Agentic Planner',
+        'Agent Detail UI',
+        'Agent: Referral Planner',
+        'LLM Planner (care plan JSON)',
+        'Consent / Policy Engine (MCP)',
+        'Agentic Referral Agent (policy-aware)',
+        'HCA Directory (MCP)',
+        'Epic MCP (Tasks / ServiceRequests)',
+        'Downstream agents (Handoff / Monitoring)',
         'Tasks • Messages • Sharing Decisions'
       ],
       consent: [
         'Health UI',
-        'Ownership Trigger API (/demo/consent-check)',
+        'Agent: Consent Check (via /demo/consent-check)',
         'MCP: Policy Engine',
-        'LLM/Rules Evaluation',
-        'Allow / Deny Decision'
+        'LLM / Rules Evaluation',
+        'Consent Check Agent',
+        'Allow / Deny Decision',
+        'Human override (if escalated)'
       ],
       uber: [
         'Health UI',
+        'Agent: Discharge Transport Router',
+        'LLM / Rules (transport need)',
         'Ownership Trigger API (/demo/uber)',
-        'LLM / Rules (purpose selection)',
-        'Transport Booking Service'
-      ]
+        'Uber MCP',
+        'Transport Booking Service',
+        'Patient notification'
+      ],
+      hd_step1: [
+        'Hospital Discharge UI',
+        'Agent: Discharge Readiness & Risk',
+        'LLM (risk stratification)',
+        'Epic MCP (discharge event + bundle)',
+        'EMR CSVs (risk scores + diagnosis)',
+        'Discharge Readiness Agent (final JSON)',
+        'Clinician review & bundle selection'
+      ],
+      hd_step2: [
+        'Hospital Discharge UI',
+        'Agent: Medication Reconciliation',
+        'Epic MCP (MedicationRequests)',
+        'EMR meds CSVs (home / inpatient / discharge)',
+        'LLM (reconciliation plan)',
+        'Medication Reconciliation Agent (structured diff)',
+        'Pharmacist & patient counselling'
+      ],
+      hd_step3: [
+        'Hospital Discharge UI',
+        'Agent: Follow-Up Orchestration',
+        'Epic MCP (Observations / risk context)',
+        'LLM (follow-up plan JSON)',
+        'Agent: Follow-Up (status normalisation)',
+        'Epic MCP (Task create for MISSING)',
+        'Agent: Follow-Up (plan + executed tasks)',
+        'FOLLOW_UP_APPOINTMENTS.csv (existing)',
+        'Agent: Appointment Execution / UI (calendar)',
+        'Human date & time selection',
+        'FOLLOW_UP_APPOINTMENTS.csv (booked)',
+        'Epic MCP (booking Tasks)',
+        'Updated narrative to clinician'
+      ],
+      hd_step4: [
+        'Hospital Discharge UI',
+        'Agent: GP & Community Handoff',
+        'Epic MCP (ServiceRequests)',
+        'LLM (handoff summary + actions)',
+        'Agent: Handoff (routing decisions)',
+        'HCA Provider Directory (MCP)',
+        'Epic MCP (messages / tasks)',
+        'GP / Community services',
+        'Clinician & GP review'
+      ],
+      hd_step5: [
+        'Hospital Discharge UI',
+        'Agent: Post-Discharge Monitoring',
+        'Epic MCP (CarePlans)',
+        'LLM (check-in plan JSON)',
+        'Agent: Monitoring (rules & alerts)',
+        'Avatar / SMS channel',
+        'Patient responses',
+        'Clinician escalation queue'
+      ],
+      hd_step6: [
+        'Hospital Discharge UI',
+        'Agent: Outcomes & Governance',
+        'Epic MCP (Audit / encounters)',
+        'EMR outcome CSVs',
+        'LLM (cohort KPIs + narrative)',
+        'Governance dashboard',
+        'Quality & safety review board'
+      ],
     };
 
     function appendExecutionGraph(kind, payload, data) {
@@ -1494,8 +1572,18 @@ ASSISTANT:
         node.textContent = n;
         node.style.padding = '2px 8px';
         node.style.borderRadius = '999px';
-        node.style.background = idx === 0 ? '#e0f2fe' : (idx === nodes.length - 1 ? '#ecfdf5' : '#eef2ff');
-        node.style.border = '1px solid #d4d4d8';
+
+        const isAgent = typeof n === 'string' && n.startsWith('Agent:');
+        if (isAgent) {
+          // Highlight small, purpose-built agents in a distinct colour so
+          // multi-agent orchestration is visually obvious.
+          node.style.background = '#fef3c7';
+          node.style.border = '1px solid #fbbf24';
+          node.style.color = '#92400e';
+        } else {
+          node.style.background = idx === 0 ? '#e0f2fe' : (idx === nodes.length - 1 ? '#ecfdf5' : '#eef2ff');
+          node.style.border = '1px solid #d4d4d8';
+        }
         flow.appendChild(node);
         if (idx < nodes.length - 1) {
           const arrow = document.createElement('span');
@@ -1744,12 +1832,14 @@ ASSISTANT:
       const llmEl = document.getElementById('hd_llm_logic');
       const resJsonEl = document.getElementById('ha_result_json');
       const resTextEl = document.getElementById('ha_result_text');
+      const graphEl = document.getElementById('ha_graph');
       if (!selEl || !stepsEl) return;
       // When a new patient is selected, clear any previous agent results and
       // decision logic so the panels reflect only runs for the current patient.
       if (llmEl) llmEl.textContent = '';
       if (resJsonEl) resJsonEl.textContent = '';
       if (resTextEl) resTextEl.innerHTML = '';
+      if (graphEl) graphEl.innerHTML = '';
       if (!p) {
         selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
         stepsEl.innerHTML = '';
