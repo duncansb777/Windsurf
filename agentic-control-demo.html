@@ -2577,7 +2577,7 @@ ASSISTANT:
       slotsEl.innerHTML = '<span style="font-size:12px; color:var(--muted);">Loading slots…</span>';
 
       try {
-        const resp = await fetch('/demo/followups/slots', {
+        const resp = await fetch((HEALTH_API.baseUrl || '') + '/demo/followups/slots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2643,7 +2643,7 @@ ASSISTANT:
       }
 
       try {
-        const resp = await fetch('/demo/followups/book', {
+        const resp = await fetch((HEALTH_API.baseUrl || '') + '/demo/followups/book', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
