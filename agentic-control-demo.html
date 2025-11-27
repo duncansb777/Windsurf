@@ -1502,7 +1502,38 @@ ASSISTANT:
         'Human date & time selection',
         'FOLLOW_UP_APPOINTMENTS.csv (booked)',
         'Epic MCP (booking Tasks)',
-        'Updated narrative to clinician'
+        'Updated narrative to clinician',
+        // Governance / safety / policy agents supervising the flow
+        'Gov: Regulatory Compliance Agent',
+        'Gov: Policy Guardrail Agent',
+        'Gov: Privacy & Data-Handling Agent',
+        'Gov: Model Drift Detection Agent',
+        'Gov: Operational Risk Agent',
+        'Gov: Safety Alignment Agent',
+        'Gov: Reason Trace Agent',
+        'Gov: Audit Trail Agent',
+        'Gov: Version & Change Control Agent',
+        'Gov: Context Validator Agent',
+        'Gov: Context Drift Agent',
+        'Gov: Ontology Alignment Agent',
+        'Gov: Continuous Improvement Agent',
+        'Gov: Quality Assurance Agent',
+        'Gov: Outcome Consistency Agent',
+        'Gov: Identity & Role Verification Agent',
+        'Gov: Secrets Management Agent',
+        'Gov: Threat Detection Agent',
+        'Gov: Decision Escalation Agent',
+        'Gov: Approval Workflow Agent',
+        'Gov: Supervisor Agent',
+        'Gov: Model Performance Monitoring Agent',
+        'Gov: Retraining & Refresh Agent',
+        'Gov: Model Routing Agent',
+        'Gov: Data Quality Agent',
+        'Gov: Lineage Tracking Agent',
+        'Gov: Retention & Archival Agent',
+        'Gov: Interoperability Agent',
+        'Gov: Exception Routing Agent',
+        'Gov: AI Product Guardrail Agent'
       ],
       hd_step4: [
         'Hospital Discharge UI',
@@ -1574,12 +1605,19 @@ ASSISTANT:
         node.style.borderRadius = '999px';
 
         const isAgent = typeof n === 'string' && n.startsWith('Agent:');
+        const isGov = typeof n === 'string' && n.startsWith('Gov:');
         if (isAgent) {
-          // Highlight small, purpose-built agents in a distinct colour so
+          // Highlight small, purpose-built agents in amber so
           // multi-agent orchestration is visually obvious.
           node.style.background = '#fef3c7';
           node.style.border = '1px solid #fbbf24';
           node.style.color = '#92400e';
+        } else if (isGov) {
+          // Governance / safety / policy agents get a distinct purple style
+          // to emphasise the independent control mesh around transactional agents.
+          node.style.background = '#f3e8ff';
+          node.style.border = '1px solid #a855f7';
+          node.style.color = '#6b21a8';
         } else {
           node.style.background = idx === 0 ? '#e0f2fe' : (idx === nodes.length - 1 ? '#ecfdf5' : '#eef2ff');
           node.style.border = '1px solid #d4d4d8';
