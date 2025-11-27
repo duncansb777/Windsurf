@@ -2608,9 +2608,21 @@ ASSISTANT:
               return bits.join(' · ');
             }
 
-            const contList = contArr.map(m => `• ${medLabel(m)}`).join('<br/>');
-            const startedList = startedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
-            const stoppedList = stoppedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            function medLine(m) {
+              const base = `• ${medLabel(m)}`;
+              const desc = m.simple_description || m.description || '';
+              if (!desc) return base;
+              return (
+                base +
+                '<br/>&nbsp;&nbsp;<span style="color:#6b7280; font-size:12px;">' +
+                desc +
+                '</span>'
+              );
+            }
+
+            const contList = contArr.map(medLine).join('<br/>');
+            const startedList = startedArr.map(medLine).join('<br/>');
+            const stoppedList = stoppedArr.map(medLine).join('<br/>');
 
             // Surface high-risk medicines explicitly, aligned with Prompt Studio
             // policy: "Always flag high-risk medicines (anticoagulants, insulin,

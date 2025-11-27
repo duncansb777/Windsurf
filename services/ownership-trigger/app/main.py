@@ -594,6 +594,43 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         # so the EMR is the single source of truth for medication changes.
         edu = recon.get("education_points") or []
 
+        # Capture any simple natural-language descriptions the LLM may have
+        # attached to its own reconciliation lists so we can merge them back
+        # onto the EMR-derived meds by name. This lets policies like
+        # "Provide a simple description of the medication they are taking in
+        # the natural language output" take effect without ceding structural
+        # control of the list to the LLM.
+        desc_by_name: dict[str, str] = {}
+        try:
+            def _extract_desc_map(items: list[dict] | None) -> None:
+                if not items:
+                    return
+                for m in items:
+                    if not isinstance(m, dict):
+                        continue
+                    n = (
+                        m.get("medication_name")
+                        or m.get("name")
+                        or m.get("MEDICATION_NAME")
+                        or m.get("MED_NAME")
+                        or ""
+                    ).strip().lower()
+                    if not n:
+                        continue
+                    desc = (
+                        m.get("simple_description")
+                        or m.get("description")
+                        or m.get("nl_description")
+                    )
+                    if desc and n not in desc_by_name:
+                        desc_by_name[n] = str(desc)
+
+            _extract_desc_map(recon.get("continued"))
+            _extract_desc_map(recon.get("started"))
+            _extract_desc_map(recon.get("stopped"))
+        except Exception:
+            desc_by_name = {}
+
         try:
             csv_ctx = mcp_context.get("csv", {}) if isinstance(mcp_context, dict) else {}
             home_rows = csv_ctx.get("home_meds") or []
@@ -601,14 +638,24 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             discharge_rows = csv_ctx.get("discharge_meds") or []
 
             def _med_from_row(r: dict, source: str) -> dict:
-                return {
+                name_val = r.get("MEDICATION_NAME") or r.get("MED_NAME") or "Medication"
+                med: dict = {
                     "source": source,
-                    "medication_name": r.get("MEDICATION_NAME") or r.get("MED_NAME") or "Medication",
+                    "medication_name": name_val,
                     "dose": r.get("DOSE") or r.get("STRENGTH") or "",
                     "route": r.get("ROUTE") or "",
                     "frequency": r.get("FREQUENCY") or "",
                     "status": r.get("STATUS") or "ACTIVE",
                 }
+                # If the LLM provided a simple description for this med name,
+                # attach it so the frontend can surface it in the narrative.
+                try:
+                    key = (name_val or "").strip().lower()
+                    if key and desc_by_name.get(key):
+                        med["simple_description"] = desc_by_name[key]
+                except Exception:
+                    pass
+                return med
 
             def _key(r: dict) -> str:
                 # Use a simple case-insensitive name key for grouping
