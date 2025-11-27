@@ -2655,6 +2655,42 @@ ASSISTANT:
         const data = await resp.json();
         const summary = data.summary_text || 'Follow-up appointments booked.';
         showToast(summary);
+
+        // Append a precise summary of the appointments just booked via the
+        // follow-up modal into the Health Agent Result panel so the natural
+        // language view reflects the exact date/time the user selected.
+        try {
+          const appts = Array.isArray(data.appointments) ? data.appointments : [];
+          if (appts.length) {
+            const container = document.getElementById('ha_result_text');
+            if (container) {
+              const parts = appts.map(a => {
+                const t = a.type || 'Appointment';
+                const reason = a.reason || '';
+                let when = a.datetime || '';
+                try {
+                  if (a.datetime) {
+                    const d = new Date(a.datetime);
+                    if (!isNaN(d.getTime())) {
+                      const dateStr = d.toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Australia/Sydney' });
+                      const timeStr = d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', timeZone: 'Australia/Sydney' });
+                      when = `${dateStr}, ${timeStr}`;
+                    }
+                  }
+                } catch (e) {}
+                const prov = a.provider_id ? ` (provider: ${a.provider_id})` : '';
+                const task = a.task_id ? ` (Task ID: ${a.task_id})` : '';
+                const because = reason ? ` because: ${reason}` : '';
+                return `• ${t} on ${when}${prov}${because}${task}`;
+              }).join('<br/>');
+
+              const block = document.createElement('div');
+              block.style.marginTop = '8px';
+              block.innerHTML = `<p><strong>Appointments booked via follow-up modal:</strong><br/>${parts}</p>`;
+              container.appendChild(block);
+            }
+          }
+        } catch (e) {}
       } catch (e) {
         showToast('Error booking follow-up appointments.');
       }
