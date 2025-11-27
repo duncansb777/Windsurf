@@ -644,7 +644,19 @@
                 <div class="footer-actions">
                   <button class="btn" onclick="showToast('Policies edited (mock)')">Edit</button>
                   <button class="btn" onclick="showToast('Policy changes saved (mock)')">Save Draft</button>
-                  <button class="btn primary" onclick="submitPoliciesForAgentic()">Submit to LLM for Agentic Referral</button>
+                  <button
+    class="btn primary"
+    onclick="
+      (function () {
+        var polEl = document.getElementById('policyText');
+        var policies_markdown = polEl ? polEl.value : '';
+        window.__agenticReferralPolicy = { policies_markdown: policies_markdown };
+        showToast('Policies submitted for Agentic Referral demo.');
+      })();
+    "
+  >
+    Submit to LLM for Agentic Referral
+  </button>
                 </div>
               </div>
               <div class="tabpane">
