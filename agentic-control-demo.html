@@ -2659,12 +2659,24 @@ ASSISTANT:
             }
 
             // Primary bullets stay grounded in the EMR-derived reconciliation
-            // lists. Any richer narrative the LLM generates is shown in a
-            // separate section below so policies can freely change it without
-            // us over-constraining the structure here.
-            const contList = contArr.map(m => `• ${medLabel(m)}`).join('<br/>');
-            const startedList = startedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
-            const stoppedList = stoppedArr.map(m => `• ${medLabel(m)}`).join('<br/>');
+            // lists. When the LLM has provided a per-med simple_description
+            // (driven by policies), we show it as a muted second line under the
+            // bullet without changing the underlying EMR structure.
+            function medLine(m) {
+              const base = `• ${medLabel(m)}`;
+              const desc = m.simple_description || m.description || m.nl_description || '';
+              if (!desc) return base;
+              return (
+                base +
+                '<br/>&nbsp;&nbsp;<span style="color:#6b7280; font-size:12px;">' +
+                desc +
+                '</span>'
+              );
+            }
+
+            const contList = contArr.map(medLine).join('<br/>');
+            const startedList = startedArr.map(medLine).join('<br/>');
+            const stoppedList = stoppedArr.map(medLine).join('<br/>');
 
             // Surface high-risk medicines explicitly, aligned with Prompt Studio
             // policy: "Always flag high-risk medicines (anticoagulants, insulin,
