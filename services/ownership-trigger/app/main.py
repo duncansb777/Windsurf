@@ -848,57 +848,14 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
             # UI can treat it as created/requested via Task for this run. CSV-
             # backed appointments remain ALREADY_SCHEDULED; Task-created ones
             # are marked as CREATED so downstream views can distinguish new
-            # bookings from existing ones.
+            # bookings from existing ones. We intentionally do NOT fabricate a
+            # concrete appointment date/time or EMR row here; concrete
+            # bookings are created later via the interactive booking flow
+            # (/demo/followups/book).
             try:
                 fup["status"] = "CREATED"
-                # If there is no real slot from CSV, synthesise an approximate
-                # appointment_date_time from the LLM timeframe so the UI can
-                # display a concrete day/date/time rather than a vague phrase.
-                if not fup.get("appointment_date_time"):
-                    approx = _approx_appointment_datetime(fup.get("recommended_timeframe"))
-                    if approx:
-                        fup["appointment_date_time"] = approx
                 if isinstance(task_res, dict) and task_res.get("id"):
                     fup["task_id"] = task_res["id"]
-                # Also persist an EMR-level booking row so that downstream
-                # views see a concrete appointment in FOLLOW_UP_APPOINTMENTS.
-                try:
-                    appt_csv_path = os.path.join(BASE_DIR, "data", "csv", "FOLLOW_UP_APPOINTMENTS.csv")
-                    file_exists = os.path.exists(appt_csv_path)
-                    # Ensure file exists with header
-                    if not file_exists:
-                        with open(appt_csv_path, "w", newline="") as fcsv:
-                            w = csv.writer(fcsv)
-                            w.writerow([
-                                "APPOINTMENT_ID",
-                                "PATIENT_ID",
-                                "ENCOUNTER_ID",
-                                "TYPE",
-                                "PROVIDER_ID",
-                                "DATE_TIME",
-                                "STATUS",
-                            ])
-                    # Append the new appointment row
-                    from datetime import datetime
-                    appt_id = f"FU-{pid}-{int(time.time())}"
-                    enc_id = req.encounter_id or f"ENC{str(pid)[1:]}"
-                    prov_id = fup.get("provider_id") or ""
-                    dt_str = fup.get("appointment_date_time") or ""
-                    with open(appt_csv_path, "a", newline="") as fcsv:
-                        w = csv.writer(fcsv)
-                        w.writerow([
-                            appt_id,
-                            pid,
-                            enc_id,
-                            fup.get("type") or "appointment",
-                            prov_id,
-                            dt_str,
-                            "SCHEDULED",
-                        ])
-                except Exception:
-                    # Best-effort only; if EMR CSV write fails we still keep
-                    # the Task-backed booking for this demo.
-                    pass
             except Exception:
                 pass
 
