@@ -2522,6 +2522,16 @@ ASSISTANT:
         }
       } catch (e) {}
 
+      try {
+        var resultPreview = JSON.stringify(res, null, 2);
+        if (resultPreview && resultPreview !== '{}') {
+          var trimmedResult = resultPreview.length > 1200 ? resultPreview.slice(0, 1200) + '\n…' : resultPreview;
+          html += '<p><strong>Result object (information returned by LLM/backend for this step):</strong></p>' +
+            '<pre style="white-space:pre-wrap; background:#f9fafb; color:#111827; border-radius:4px; padding:6px; max-height:200px; overflow:auto;">' +
+            escapeHtml(trimmedResult) + '</pre>';
+        }
+      } catch (e) {}
+
       if (!html) {
         html = '<p style="color:#6b7280;">Run a Hospital Discharge step to see the active policies and raw LLM output used for that run.</p>';
       }
