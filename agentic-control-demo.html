@@ -2412,6 +2412,10 @@ ASSISTANT:
         renderHdLogic(stepId, fallback);
       }
 
+      try {
+        renderHdPoliciesAndRaw(stepId, promptCtx, data || {});
+      } catch (e) {}
+
       // Update discharge progress for this patient and refresh Status column
       const stepNum = parseInt(String(stepId).replace('step', ''), 10) || 0;
       if (stepNum > 0) {
@@ -2455,6 +2459,73 @@ ASSISTANT:
         return;
       }
       el.textContent = header + lines.map(l => '• ' + l).join('\n');
+    }
+
+    function renderHdPoliciesAndRaw(stepId, promptCtx, data) {
+      const bodyEl = document.getElementById('hd_policies_llm_body');
+      if (!bodyEl) return;
+      const ctx = promptCtx || {};
+      const pack = ctx.pack || '';
+      const domain = ctx.domain || '';
+      const instr = (ctx.instructions || '').toString();
+      const pol = (ctx.policies_markdown || '').toString();
+      const base = data || {};
+      const res = base.result || base;
+      const llmReasoning = Array.isArray(res.llm_reasoning) ? res.llm_reasoning : (Array.isArray(base.llm_reasoning) ? base.llm_reasoning : []);
+      const recon = res.reconciliation || {};
+      const edu = Array.isArray(recon.education_points) ? recon.education_points : [];
+      const planRaw = res.plan_raw || {};
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      let html = '';
+      const metaLines = [];
+      metaLines.push('Step: ' + stepId);
+      if (pack) metaLines.push('Pack: ' + pack);
+      if (domain) metaLines.push('Domain: ' + domain);
+      html += '<p><strong>Prompt context:</strong><br/>' + metaLines.map(function (l) { return escapeHtml(l); }).join('<br/>') + '</p>';
+
+      if (instr) {
+        var trimmedInstr = instr.length > 800 ? instr.slice(0, 800) + '…' : instr;
+        html += '<p><strong>Instructions sent to LLM:</strong></p>' +
+          '<pre style="white-space:pre-wrap; background:#f3f4f6; border-radius:4px; padding:6px; max-height:160px; overflow:auto;">' +
+          escapeHtml(trimmedInstr) + '</pre>';
+      }
+      if (pol) {
+        var trimmedPol = pol.length > 800 ? pol.slice(0, 800) + '…' : pol;
+        html += '<p><strong>Policies sent to LLM:</strong></p>' +
+          '<pre style="white-space:pre-wrap; background:#f3f4f6; border-radius:4px; padding:6px; max-height:160px; overflow:auto;">' +
+          escapeHtml(trimmedPol) + '</pre>';
+      }
+
+      if (llmReasoning && llmReasoning.length) {
+        html += '<p><strong>LLM reasoning field:</strong><br/>' +
+          llmReasoning.map(function (l) { return '• ' + escapeHtml(l); }).join('<br/>') + '</p>';
+      }
+      if (edu && edu.length) {
+        html += '<p><strong>Education points from LLM schema:</strong><br/>' +
+          edu.map(function (e) { return '• ' + escapeHtml(e); }).join('<br/>') + '</p>';
+      }
+
+      try {
+        var rawPreview = JSON.stringify(planRaw, null, 2);
+        if (rawPreview && rawPreview !== '{}') {
+          var trimmedRaw = rawPreview.length > 1200 ? rawPreview.slice(0, 1200) + '\n…' : rawPreview;
+          html += '<p><strong>plan_raw (raw LLM JSON for this step):</strong></p>' +
+            '<pre style="white-space:pre-wrap; background:#0b1020; color:#e5e7eb; border-radius:4px; padding:6px; max-height:200px; overflow:auto;">' +
+            escapeHtml(trimmedRaw) + '</pre>';
+        }
+      } catch (e) {}
+
+      if (!html) {
+        html = '<p style="color:#6b7280;">Run a Hospital Discharge step to see the active policies and raw LLM output used for that run.</p>';
+      }
+      bodyEl.innerHTML = html;
     }
 
     function openQuickRun() {
