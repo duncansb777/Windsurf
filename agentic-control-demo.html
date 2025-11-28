@@ -2355,7 +2355,7 @@ ASSISTANT:
           (packCfg && packCfg.instructions) ||
           '',
         policies_markdown:
-          (baseCtx.pack === autoPackName && baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) ||
+          (baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) ||
           (packCfg && packCfg.policies) ||
           ''
       };
