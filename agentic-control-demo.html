@@ -2343,6 +2343,11 @@ ASSISTANT:
       };
       const autoPackName = packPerStep[stepId] || baseCtx.pack || '';
       const packCfg = autoPackName && PROMPT_PACKS[autoPackName] ? PROMPT_PACKS[autoPackName] : null;
+      const activePackCfg = baseCtx.pack && PROMPT_PACKS[baseCtx.pack] ? PROMPT_PACKS[baseCtx.pack] : null;
+      const activeIsHealth = !!(activePackCfg && activePackCfg.domain === 'health');
+      const studioPolicies = activeIsHealth && baseCtx.policies_markdown
+        ? baseCtx.policies_markdown.trim()
+        : '';
       const promptCtx = {
         pack: autoPackName,
         domain: (packCfg && packCfg.domain) || baseCtx.domain || 'health',
@@ -2355,7 +2360,7 @@ ASSISTANT:
           (packCfg && packCfg.instructions) ||
           '',
         policies_markdown:
-          (baseCtx.policies_markdown && baseCtx.policies_markdown.trim()) ||
+          studioPolicies ||
           (packCfg && packCfg.policies) ||
           ''
       };
