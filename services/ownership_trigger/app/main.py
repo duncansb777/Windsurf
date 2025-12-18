@@ -1279,20 +1279,26 @@ def demo_hd_step7(req: HdStepRequest):
                 )
             else:
                 murl = str(src.get("map_url") or "")
-            summary_bits: list[str] = []
-            if src.get("mode"):
-                summary_bits.append(str(src["mode"]))
-            if src.get("distance_km") is not None:
-                summary_bits.append(f"{src['distance_km']} km")
-            if src.get("eta_minutes") is not None:
-                summary_bits.append(f"{src['eta_minutes']} min")
-            # Use a simple bullet separator between summary fragments.
-            summary = " • ".join(summary_bits)
-            if src.get("notes"):
-                if summary:
-                    summary += " • " + str(src["notes"])
-                else:
-                    summary = str(src["notes"])
+            # Prefer the Maps MCP human-readable summary when available so
+            # that the on-screen description reflects the MCP output
+            # rather than older LLM demo examples.
+            if maps_route and isinstance(maps_route, dict) and maps_route.get("summary"):
+                summary = str(maps_route["summary"])
+            else:
+                summary_bits: list[str] = []
+                if src.get("mode"):
+                    summary_bits.append(str(src["mode"]))
+                # Do not surface LLM-estimated numeric distance/ETA here,
+                # as they may not exactly match the live Google Maps route.
+                # Instead, let Google Maps be the source of truth for
+                # distance/time and keep the narrative notes alongside the
+                # chosen transport mode.
+                summary = " • ".join(summary_bits)
+                if src.get("notes"):
+                    if summary:
+                        summary += " • " + str(src["notes"])
+                    else:
+                        summary = str(src["notes"])
             return {
                 "label": label,
                 "map_url": murl,
