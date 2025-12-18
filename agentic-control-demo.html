@@ -2705,23 +2705,64 @@ ASSISTANT:
         container.innerHTML = '';
         return;
       }
+      const routes = Array.isArray(tm.routes) ? tm.routes : null;
 
-      const imgUrl = tm.static_map_url || tm.image_url || '';
-      const mapLink = tm.map_url || tm.link || '';
-      const summary = tm.summary || '';
+      let html = '';
+      const headingParts = [];
+      if (tm.hospital_location) headingParts.push('From ' + tm.hospital_location);
+      if (tm.hotel_location) headingParts.push('to ' + tm.hotel_location);
 
-      let html = '<div class="card" style="padding:8px;">';
-      html += '<div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Transport map (Google Maps MCP)</div>';
-      if (imgUrl) {
-        html += '<img src="' + imgUrl + '" alt="Hospital-to-hotel route map" style="max-width:100%; border-radius:8px; border:1px solid var(--border);" />';
+      if (routes && routes.length) {
+        routes.forEach(function (r, idx) {
+          const label = r.label || ('Route ' + (idx + 1));
+          const imgUrl = r.static_map_url || r.image_url || '';
+          const mapLink = r.map_url || r.link || '';
+          const summary = r.summary || '';
+
+          html += '<div class="card" style="padding:8px; margin-bottom:8px;">';
+          html += '<div style="font-size:12px; color:var(--muted); margin-bottom:4px;">' + label + ' (Google Maps MCP)</div>';
+          if (headingParts.length) {
+            html += '<div style="font-size:11px; color:var(--muted);">' + headingParts.join(' ') + '</div>';
+          }
+          if (imgUrl) {
+            html += '<img src="' + imgUrl + '" alt="' + label + ' map" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin-top:4px;" />';
+          } else if (mapLink) {
+            // Fallback visual: embed the map URL in an iframe when we do not
+            // have an explicit static map image URL.
+            html += '<iframe src="' + mapLink + '" style="width:100%; height:260px; border:0; border-radius:8px; margin-top:4px;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>';
+          }
+          if (summary) {
+            html += '<div style="margin-top:4px; font-size:12px;">' + summary + '</div>';
+          }
+          if (mapLink) {
+            html += '<div style="margin-top:4px;"><a href="' + mapLink + '" target="_blank" rel="noopener" class="link-cell">Open in Google Maps</a></div>';
+          }
+          html += '</div>';
+        });
+      } else {
+        const imgUrl = tm.static_map_url || tm.image_url || '';
+        const mapLink = tm.map_url || tm.link || '';
+        const summary = tm.summary || '';
+
+        html = '<div class="card" style="padding:8px;">';
+        html += '<div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Transport map (Google Maps MCP)</div>';
+        if (headingParts.length) {
+          html += '<div style="font-size:11px; color:var(--muted);">' + headingParts.join(' ') + '</div>';
+        }
+        if (imgUrl) {
+          html += '<img src="' + imgUrl + '" alt="Hospital-to-hotel route map" style="max-width:100%; border-radius:8px; border:1px solid var(--border); margin-top:4px;" />';
+        } else if (mapLink) {
+          html += '<iframe src="' + mapLink + '" style="width:100%; height:260px; border:0; border-radius:8px; margin-top:4px;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>';
+        }
+        if (summary) {
+          html += '<div style="margin-top:4px; font-size:12px;">' + summary + '</div>';
+        }
+        if (mapLink) {
+          html += '<div style="margin-top:4px;"><a href="' + mapLink + '" target="_blank" rel="noopener" class="link-cell">Open in Google Maps</a></div>';
+        }
+        html += '</div>';
       }
-      if (summary) {
-        html += '<div style="margin-top:4px; font-size:12px;">' + summary + '</div>';
-      }
-      if (mapLink) {
-        html += '<div style="margin-top:4px;"><a href="' + mapLink + '" target="_blank" rel="noopener" class="link-cell">Open in Google Maps</a></div>';
-      }
-      html += '</div>';
+
       container.innerHTML = html;
     }
 

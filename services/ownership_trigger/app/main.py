@@ -1229,6 +1229,61 @@ def demo_hd_step7(req: HdStepRequest):
             # the LLM step output so the demo UI continues to work.
             pass
 
+    # Fallback: if no transport_map was attached (e.g. Maps MCP is not
+    # configured), attempt to parse the LLM raw_text JSON and project
+    # primary/fallback routes into a normalised transport_map structure
+    # that the UI can render as multiple routes.
+    if "transport_map" not in base:
+        try:
+            raw = base.get("raw_text") or ""
+            doc = json.loads(raw) if raw else {}
+        except Exception:
+            doc = {}
+
+        if isinstance(doc, dict):
+            routes = []
+            primary = doc.get("primary_route") or {}
+            fallback = doc.get("fallback_route") or {}
+
+            def _route_from(src: dict, label: str) -> dict | None:
+                if not isinstance(src, dict) or not src:
+                    return None
+                murl = src.get("map_url") or ""
+                if not murl:
+                    return None
+                summary_bits = []
+                if src.get("mode"):
+                    summary_bits.append(str(src["mode"]))
+                if src.get("distance_km") is not None:
+                    summary_bits.append(f"{src['distance_km']} km")
+                if src.get("eta_minutes") is not None:
+                    summary_bits.append(f"{src['eta_minutes']} min")
+                summary = "  b7 ".join(summary_bits)
+                if src.get("notes"):
+                    if summary:
+                        summary += "  b7 " + str(src["notes"])
+                    else:
+                        summary = str(src["notes"])
+                return {
+                    "label": label,
+                    "map_url": murl,
+                    "summary": summary,
+                }
+
+            r_primary = _route_from(primary, "Primary route")
+            if r_primary:
+                routes.append(r_primary)
+            r_fallback = _route_from(fallback, "Fallback route")
+            if r_fallback:
+                routes.append(r_fallback)
+
+            if routes:
+                base["transport_map"] = {
+                    "hospital_location": doc.get("hospital_location"),
+                    "hotel_location": doc.get("hotel_location"),
+                    "routes": routes,
+                }
+
     return base
 
 
