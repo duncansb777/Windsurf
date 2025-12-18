@@ -865,7 +865,7 @@
   <script>
     // Agent execution config (update baseUrl/path to match your Health services)
     const AGENTS_EXEC = {
-      baseUrl: 'http://localhost:8000',
+      baseUrl: 'http://localhost:8001',
       path: '/agents/run',
       perAgent: {
         'Balance Transfer Agent': '/agents/balance-transfer/run',
@@ -1513,7 +1513,7 @@ ASSISTANT:
           policies_markdown: cfg.policies || ''
         }));
         if (!packs.length) return;
-        await fetch('http://localhost:8000/prompt-packs/register', {
+        await fetch('http://localhost:8001/prompt-packs/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ packs })
