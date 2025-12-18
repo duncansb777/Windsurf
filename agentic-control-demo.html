@@ -2485,7 +2485,7 @@ ASSISTANT:
       const p = HD_PATIENTS.find(x => x.patientId === pid);
       if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
       const kind = 'hd_' + stepId;
-      let basePayload = { patient_id: pid };
+      let basePayload = { step_id: stepId, patient_id: pid };
       if (stepId === 'step1') basePayload.agent = 'discharge_readiness';
       else if (stepId === 'step2') basePayload.agent = 'medication_reconciliation';
       else if (stepId === 'step3') basePayload.agent = 'follow_up_orchestration';

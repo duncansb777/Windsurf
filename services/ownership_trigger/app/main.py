@@ -7,9 +7,9 @@ import time
 import json
 import random
 from typing import Optional, List
-from ccs_tools import ccs_get_meter_reads
-from agentis_demo import run_demo as agentis_run_demo
-from agentis_demo import run_referral_demo as agentis_run_referral
+from .ccs_tools import ccs_get_meter_reads
+from .agentis_demo import run_demo as agentis_run_demo
+from .agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
 from libs.agentis.llm_client import LLMClient
 from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client
@@ -1166,6 +1166,16 @@ def demo_hd_step5(req: HdStepRequest):
 @app.post("/demo/hd-step6")
 def demo_hd_step6(req: HdStepRequest):
     return _run_hd_step(req, "step6")
+
+
+@app.post("/demo/hd-step7")
+def demo_hd_step7(req: HdStepRequest):
+    """Hospital-to-hotel transport & map routing step.
+
+    Reuses the generic _run_hd_step helper so the LLM prompt + schema
+    come from the same discharge pipeline as steps 1–6.
+    """
+    return _run_hd_step(req, "step7")
 
 
 class ConsentCheckRequest(BaseModel):
