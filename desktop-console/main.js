@@ -25,9 +25,9 @@ function startBackend() {
   const args = [
     '-m',
     'uvicorn',
-    'services.ownership-trigger.app.main:app',
+    'services.ownership_trigger.app.main:app',
     '--port',
-    process.env.HEALTH_BACKEND_PORT || '8001',
+    process.env.HEALTH_BACKEND_PORT || '8002',
   ];
 
   backendProc = spawn(pythonCmd, args, {
@@ -127,8 +127,10 @@ function createWindow() {
     return { action: 'allow' };
   });
 
-  // If navigation fails later (e.g., file permissions), show fallback
-  win.webContents.on('did-fail-load', (_e, code, desc) => {
+  // If the TOP-LEVEL navigation fails (e.g., file permissions), show fallback.
+  // Ignore failures from subframes/iframes such as external map embeds.
+  win.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+    if (isMainFrame === false) return;
     const reason = `${code} ${desc}`;
     const targetInfo = resolveAppHtml();
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>App Load Error</title></head>

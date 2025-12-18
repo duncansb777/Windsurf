@@ -7,9 +7,23 @@ import time
 import json
 import random
 from typing import Optional, List
-from ccs_tools import ccs_get_meter_reads
-from agentis_demo import run_demo as agentis_run_demo
-from agentis_demo import run_referral_demo as agentis_run_referral
+
+try:
+    # When imported as part of the services.ownership_trigger.app package
+    from .ccs_tools import ccs_get_meter_reads
+except ImportError:  # pragma: no cover - fallback for uvicorn --app-dir usage
+    # When run with uvicorn --app-dir services/ownership_trigger/app main:app,
+    # main.py is imported as a top-level module, so relative imports are not
+    # available.
+    from ccs_tools import ccs_get_meter_reads
+
+try:
+    # Package-relative import when running as services.ownership_trigger.app.main
+    from .agentis_demo import run_demo as agentis_run_demo
+    from .agentis_demo import run_referral_demo as agentis_run_referral
+except ImportError:  # pragma: no cover - fallback for uvicorn --app-dir usage
+    from agentis_demo import run_demo as agentis_run_demo
+    from agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
 from libs.agentis.llm_client import LLMClient
 from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client, make_maps_client
@@ -1211,81 +1225,93 @@ def demo_hd_step7(req: HdStepRequest):
     # structure including a static map image URL.
     origin = req.hospital_address or ""
     destination = req.hotel_address or ""
+    maps_route: dict | None = None
     if origin and destination:
         try:
             maps = make_maps_client()
-            route = maps.call(
+            maps_route = maps.call(
                 "maps.route_with_static_map",
                 {
                     "origin": origin,
                     "destination": destination,
                 },
             )
-            # Attach map metadata under a dedicated key so the UI can
-            # show a capture without disturbing existing step fields.
-            base["transport_map"] = route
         except Exception:
             # If Maps MCP is unavailable or misconfigured (e.g.
             # MCP_MAPS_CMD not set), still return the LLM step output so
             # the demo UI continues to work. A fallback transport_map
-            # may still be populated from the LLM JSON below.
-            pass
+            # will be populated from the LLM JSON below.
+            maps_route = None
 
-    # Fallback: if no transport_map was attached (e.g. Maps MCP is not
-    # configured), attempt to parse the LLM raw_text JSON and project
-    # primary/fallback routes into a normalised transport_map structure
-    # that the UI can render as multiple routes.
-    if "transport_map" not in base:
-        try:
-            raw = base.get("raw_text") or ""
-            doc = json.loads(raw) if raw else {}
-        except Exception:
-            doc = {}
+    # Build a normalised transport_map structure that always uses the
+    # user-entered hospital/hotel addresses (when available) for the
+    # headings, and prefers the Google Maps MCP link for map_url while
+    # reusing the LLM's primary/fallback narrative for summaries.
+    try:
+        raw = base.get("raw_text") or ""
+        doc = json.loads(raw) if raw else {}
+    except Exception:
+        doc = {}
 
-        if isinstance(doc, dict):
-            routes = []
-            primary = doc.get("primary_route") or {}
-            fallback = doc.get("fallback_route") or {}
+    if isinstance(doc, dict):
+        routes: list[dict] = []
+        primary = doc.get("primary_route") or {}
+        fallback_doc = doc.get("fallback_route") or {}
 
-            def _route_from(src: dict, label: str) -> dict | None:
-                if not isinstance(src, dict) or not src:
-                    return None
-                murl = src.get("map_url") or ""
-                if not murl:
-                    return None
-                summary_bits = []
-                if src.get("mode"):
-                    summary_bits.append(str(src["mode"]))
-                if src.get("distance_km") is not None:
-                    summary_bits.append(f"{src['distance_km']} km")
-                if src.get("eta_minutes") is not None:
-                    summary_bits.append(f"{src['eta_minutes']} min")
-                # Use a simple bullet separator between summary fragments.
-                summary = " • ".join(summary_bits)
-                if src.get("notes"):
-                    if summary:
-                        summary += " • " + str(src["notes"])
-                    else:
-                        summary = str(src["notes"])
-                return {
-                    "label": label,
-                    "map_url": murl,
-                    "summary": summary,
-                }
+        def _route_from(src: dict, label: str) -> dict | None:
+            if not isinstance(src, dict) or not src:
+                return None
+            # Prefer the Maps MCP link if available; otherwise construct a
+            # Google Maps directions URL from the user-entered origin /
+            # destination. Fall back to any LLM-provided map_url only if
+            # neither is available.
+            murl = ""
+            if maps_route and isinstance(maps_route, dict) and maps_route.get("map_url"):
+                murl = str(maps_route["map_url"])
+            elif origin and destination:
+                from urllib.parse import quote_plus
 
-            r_primary = _route_from(primary, "Primary route")
-            if r_primary:
-                routes.append(r_primary)
-            r_fallback = _route_from(fallback, "Fallback route")
-            if r_fallback:
-                routes.append(r_fallback)
+                o_enc = quote_plus(origin)
+                d_enc = quote_plus(destination)
+                murl = (
+                    "https://www.google.com/maps/dir/?api=1"
+                    f"&origin={o_enc}&destination={d_enc}&travelmode=driving"
+                )
+            else:
+                murl = str(src.get("map_url") or "")
+            summary_bits: list[str] = []
+            if src.get("mode"):
+                summary_bits.append(str(src["mode"]))
+            if src.get("distance_km") is not None:
+                summary_bits.append(f"{src['distance_km']} km")
+            if src.get("eta_minutes") is not None:
+                summary_bits.append(f"{src['eta_minutes']} min")
+            # Use a simple bullet separator between summary fragments.
+            summary = " • ".join(summary_bits)
+            if src.get("notes"):
+                if summary:
+                    summary += " • " + str(src["notes"])
+                else:
+                    summary = str(src["notes"])
+            return {
+                "label": label,
+                "map_url": murl,
+                "summary": summary,
+            }
 
-            if routes:
-                base["transport_map"] = {
-                    "hospital_location": doc.get("hospital_location"),
-                    "hotel_location": doc.get("hotel_location"),
-                    "routes": routes,
-                }
+        r_primary = _route_from(primary, "Primary route")
+        if r_primary:
+            routes.append(r_primary)
+        r_fallback = _route_from(fallback_doc, "Fallback route")
+        if r_fallback:
+            routes.append(r_fallback)
+
+        if routes:
+            base["transport_map"] = {
+                "hospital_location": origin or doc.get("hospital_location"),
+                "hotel_location": destination or doc.get("hotel_location"),
+                "routes": routes,
+            }
 
     return base
 
