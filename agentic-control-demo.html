@@ -229,7 +229,7 @@
 
       <div class="card">
         <h3>Health Agents</h3>
-        <p style="color:var(--muted); margin-top:-4px; font-size:12px;">Hospital Discharge bundle (6 agents) orchestrated through the Health screen.</p>
+        <p style="color:var(--muted); margin-top:-4px; font-size:12px;">Hospital Discharge bundle (7 agents) orchestrated through the Health screen.</p>
         <table>
           <thead>
             <tr><th>Agent / Step</th><th>Status</th><th>Risk Focus</th><th></th></tr>
@@ -279,6 +279,14 @@
               <td>Outcomes &amp; Learning</td>
               <td><span class="pill ok">Healthy</span></td>
               <td>Readmission &amp; LOS KPIs</td>
+              <td class="row" style="gap:6px;">
+                <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Hospital-to-Hotel Transport & Map</td>
+              <td><span class="pill ok">Healthy</span></td>
+              <td>Transportation &amp; mapping</td>
               <td class="row" style="gap:6px;">
                 <button class="btn" onclick="goToView('healthAgents'); selectHdPatient && selectHdPatient('P0001');">Open Panel</button>
               </td>
@@ -372,7 +380,7 @@
         </div>
         <div>
           <h4 style="margin:4px 0 8px;">Discharge Bundle (Selected Patient)</h4>
-          <div id="hd_selected_patient" style="font-size:13px; color:var(--muted); margin-bottom:4px;">Select a patient to view their 6-step discharge bundle.</div>
+          <div id="hd_selected_patient" style="font-size:13px; color:var(--muted); margin-bottom:4px;">Select a patient to view their 7-step discharge bundle.</div>
           <div class="grid" style="grid-template-columns:1fr; gap:8px;" id="hd_step_cards"></div>
         </div>
       </div>
@@ -591,9 +599,9 @@
               <li><button class="btn" data-pack="Hospital – Discharge Readiness & Risk Agent" data-domain="health">Hospital – Discharge Readiness &amp; Risk</button></li>
               <li><button class="btn" data-pack="Hospital – Medication Reconciliation Agent" data-domain="health">Hospital – Med Reconciliation</button></li>
               <li><button class="btn" data-pack="Hospital – Follow-Up Orchestration Agent" data-domain="health">Hospital – Follow-Up Orchestration</button></li>
-              <li><button class="btn" data-pack="Hospital – GP &amp; Community Handoff Agent" data-domain="health">Hospital – GP &amp; Community Handoff</button></li>
+              <li><button class="btn" data-pack="Hospital – GP & Community Handoff Agent" data-domain="health">Hospital – GP &amp; Community Handoff</button></li>
               <li><button class="btn" data-pack="Hospital – Post-Discharge Monitoring Agent" data-domain="health">Hospital – Post-Discharge Monitoring</button></li>
-              <li><button class="btn" data-pack="Hospital – Outcomes &amp; Governance Analytics Agent" data-domain="health">Hospital – Outcomes &amp; Governance</button></li>
+              <li><button class="btn" data-pack="Hospital – Outcomes & Governance Analytics Agent" data-domain="health">Hospital – Outcomes &amp; Governance</button></li>
             </ul>
           </div>
         </aside>
@@ -1239,12 +1247,12 @@ ASSISTANT:
             context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
             context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
           },
-      'Hospital – Post-Discharge Monitoring Agent': {
-        domain: 'health',
-        title: 'Hospital – Post-Discharge Monitoring Agent',
-        desc: 'LLM prompt for the Post-Discharge Monitoring Agent.',
-        affects: 'post_discharge_monitoring_agent',
-        instructions: `SYSTEM:
+          'Hospital – Post-Discharge Monitoring Agent': {
+            domain: 'health',
+            title: 'Hospital – Post-Discharge Monitoring Agent',
+            desc: 'LLM prompt for the Post-Discharge Monitoring Agent.',
+            affects: 'post_discharge_monitoring_agent',
+            instructions: `SYSTEM:
 You are the Post-Discharge Monitoring Agent.
 You work with a digital avatar channel to:
 1) Run scheduled check-ins with patients.
@@ -1297,20 +1305,77 @@ ASSISTANT:
     }
   ]
 }`,
-        policies: `- Do not override clinicians; only propose alerts and suggested actions.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
-        examples: [
-          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-        ],
-        context_hint: 'Uses POST_DISCHARGE_MONITORING_PLAN, AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA and risk agent output.',
-        context_preview: 'Monitoring plan, recent avatar interactions, clinical risk band from CSVs.'
-      },
-      'Hospital – Outcomes & Governance Analytics Agent': {
-        domain: 'health',
-        title: 'Hospital – Outcomes & Governance Analytics Agent',
-        desc: 'LLM prompt for the Outcomes & Governance Analytics Agent.',
-        affects: 'discharge_outcomes_analytics_agent',
-        instructions: `SYSTEM:
+            policies: `- Do not override clinicians; only propose alerts and suggested actions.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
+            examples: [
+              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+            ],
+            context_hint: 'Uses POST_DISCHARGE_MONITORING_PLAN, AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA and risk agent output.',
+            context_preview: 'Monitoring plan, recent avatar interactions, clinical risk band from CSVs.'
+          },
+          'Hospital – Transport & Hotel Routing Agent': {
+            domain: 'health',
+            title: 'Hospital – Transport & Hotel Routing Agent',
+            desc: 'LLM prompt for planning safe transport and hotel routing after discharge.',
+            affects: 'hospital_to_hotel_transport_agent',
+            instructions: `SYSTEM:
+You are the Hospital to Hotel Transport & Routing Agent.
+Your job is to plan a safe route from the discharging hospital to a nominated hotel for the patient, using provided address and transport constraints.
+You DO NOT actually book transport. You:
+- Propose a primary route and one fallback route.
+- Indicate distance, estimated travel time and mode (car / taxi / wheelchair transport / public transport).
+- Provide a URL that a downstream system can open to view the route on a map.
+
+CONTEXT:
+- Hospital location (address or coordinates):
+{{hospital_location}}
+- Hotel destination (address or coordinates):
+{{hotel_location}}
+- Patient mobility or transport constraints:
+{{mobility_constraints}}
+
+ASSISTANT:
+1) Suggest a primary route and one fallback route.
+2) For each route, include: mode, distance_km, eta_minutes and a map_url that can be opened in a browser.
+3) Call out any important constraints (e.g. wheelchair access, avoid long walks, avoid late-night public transport).
+4) Output strict JSON only:
+
+{
+  "patient_id": "<PATIENT_ID>",
+  "encounter_id": "<ENCOUNTER_ID>",
+  "hospital_location": "<address or coordinates>",
+  "hotel_location": "<address or coordinates>",
+  "primary_route": {
+    "mode": "<CAR|TAXI|WHEELCHAIR_TRANSPORT|PUBLIC_TRANSPORT>",
+    "distance_km": <number>,
+    "eta_minutes": <number>,
+    "map_url": "<https://maps.example/...>",
+    "notes": "<short safety / suitability notes>"
+  },
+  "fallback_route": {
+    "mode": "<CAR|TAXI|WHEELCHAIR_TRANSPORT|PUBLIC_TRANSPORT>",
+    "distance_km": <number>,
+    "eta_minutes": <number>,
+    "map_url": "<https://maps.example/...>",
+    "notes": "<short notes on when to prefer this route>"
+  }
+}`,
+            policies: `- Do not actually book transport; only recommend routes and modes.
+- Prefer safer options for higher-risk or mobility-limited patients (e.g., dedicated wheelchair transport over multi-leg public transport).
+- Keep explanations short and suitable for both clinicians and patients.`,
+            examples: [
+              { scenario:'Elderly patient needing wheelchair transport to nearby hotel', status:'Recommends wheelchair transport with short, step-free route', last_run:'Today' },
+              { scenario:'Low-risk patient going home via taxi', status:'Suggests standard taxi route plus public transport fallback', last_run:'Today' }
+            ],
+            context_hint: 'Uses hospital and hotel locations plus mobility constraints to recommend routes and map URLs.',
+            context_preview: 'Hospital address, hotel address, and mobility constraints used to generate primary and fallback routes.'
+          },
+          'Hospital – Outcomes & Governance Analytics Agent': {
+            domain: 'health',
+            title: 'Hospital – Outcomes & Governance Analytics Agent',
+            desc: 'LLM prompt for the Outcomes & Governance Analytics Agent.',
+            affects: 'discharge_outcomes_analytics_agent',
+            instructions: `SYSTEM:
 You are the Outcomes & Governance Analytics Agent.
 You aggregate discharge pathway performance for clinical governance and business value tracking.
 
@@ -1358,14 +1423,14 @@ ASSISTANT:
     "<insight 3>"
   ]
 }`,
-        policies: `- Report KPIs honestly, without hiding poor performance.\n- Break down outcomes by risk band and bundle adherence.\n- Highlight actionable trends rather than trivial correlations.`,
-        examples: [
-          { scenario:'HIGH risk patients without GP ≤7 days', status:'Flags higher readmission rate', last_run:'Today' }
-        ],
-        context_hint: 'Aggregates OUTCOME_TRACKING, PERFORMANCE_METRICS and improvement logs.',
-        context_preview: '30-day readmissions, GP follow-up, med recon completion and LOS vs baseline, sliced by risk band.'
-      }
-    };
+            policies: `- Report KPIs honestly, without hiding poor performance.\n- Break down outcomes by risk band and bundle adherence.\n- Highlight actionable trends rather than trivial correlations.`,
+            examples: [
+              { scenario:'HIGH risk patients without GP ≤7 days', status:'Flags higher readmission rate', last_run:'Today' }
+            ],
+            context_hint: 'Aggregates OUTCOME_TRACKING, PERFORMANCE_METRICS and improvement logs.',
+            context_preview: '30-day readmissions, GP follow-up, med recon completion and LOS vs baseline, sliced by risk band.'
+          }
+        };
 
     function initPromptStudio() {
       const domainSel = document.getElementById('studioDomain');
@@ -1823,6 +1888,45 @@ ASSISTANT:
         'Gov: Exception Routing Agent',
         'Gov: AI Product Guardrail Agent'
       ],
+      hd_step7: [
+        'Hospital Discharge UI',
+        'Agent: Transport & Hotel Routing',
+        'LLM (route plan)',
+        'Epic MCP (location context)',
+        'Maps / Transport API',
+        'Clinician & patient review',
+        // Governance / safety / policy agents supervising the flow
+        'Gov: Regulatory Compliance Agent',
+        'Gov: Policy Guardrail Agent',
+        'Gov: Privacy & Data-Handling Agent',
+        'Gov: Model Drift Detection Agent',
+        'Gov: Operational Risk Agent',
+        'Gov: Safety Alignment Agent',
+        'Gov: Reason Trace Agent',
+        'Gov: Audit Trail Agent',
+        'Gov: Version & Change Control Agent',
+        'Gov: Context Validator Agent',
+        'Gov: Context Drift Agent',
+        'Gov: Ontology Alignment Agent',
+        'Gov: Continuous Improvement Agent',
+        'Gov: Quality Assurance Agent',
+        'Gov: Outcome Consistency Agent',
+        'Gov: Identity & Role Verification Agent',
+        'Gov: Secrets Management Agent',
+        'Gov: Threat Detection Agent',
+        'Gov: Decision Escalation Agent',
+        'Gov: Approval Workflow Agent',
+        'Gov: Supervisor Agent',
+        'Gov: Model Performance Monitoring Agent',
+        'Gov: Retraining & Refresh Agent',
+        'Gov: Model Routing Agent',
+        'Gov: Data Quality Agent',
+        'Gov: Lineage Tracking Agent',
+        'Gov: Retention & Archival Agent',
+        'Gov: Interoperability Agent',
+        'Gov: Exception Routing Agent',
+        'Gov: AI Product Guardrail Agent'
+      ]
     };
 
     function appendExecutionGraph(kind, payload, data) {
@@ -1842,7 +1946,7 @@ ASSISTANT:
       row.style.display = 'flex';
       row.style.flexDirection = 'column';
       row.style.gap = '4px';
-      row.style.padding = '6px 4px';
+      row.style.padding = '6px';
       row.style.borderTop = '1px solid var(--border)';
 
       const header = document.createElement('div');
@@ -2067,7 +2171,9 @@ ASSISTANT:
 
     // Health API config (Ownership Trigger backend)
     const HEALTH_API = {
-      baseUrl: 'http://127.0.0.1:8001',
+      // Reuse AGENTS_EXEC.baseUrl so the app only talks to a single backend; that backend
+      // uses a mock MCP server (mcp-coo-mock) to execute the actual CoO tools.
+      get baseUrl() { return AGENTS_EXEC.baseUrl || ''; },
       endpoints: {
         discharge: '/demo/discharge',
         agenticReferral: '/demo/agentis-referral',
@@ -2078,7 +2184,8 @@ ASSISTANT:
         hd_step3: '/demo/hd-step3',
         hd_step4: '/demo/hd-step4',
         hd_step5: '/demo/hd-step5',
-        hd_step6: '/demo/hd-step6'
+        hd_step6: '/demo/hd-step6',
+        hd_step7: '/demo/hd-step7'
       }
     };
 
@@ -2196,9 +2303,9 @@ ASSISTANT:
 
       kpiEl.innerHTML = '';
       const tiles = [
-        { label:'30-day readmission rate', value: readmit30 + '%'},
-        { label:'% with GP follow-up ≤7 days', value: gp7d + '%'},
-        { label:'Medication reconciliation completion %', value: medRecon + '%'},
+        { label:'30-day readmission rate', value: readmit30 + '%' },
+        { label:'% with GP follow-up ≤7 days', value: gp7d + '%' },
+        { label:'Medication reconciliation completion %', value: medRecon + '%' },
         { label:'High-risk discharges under active monitoring', value: monitored + ' / ' + high }
       ];
       tiles.forEach(t => {
@@ -2240,10 +2347,11 @@ ASSISTANT:
         3: 'Follow-Up Orchestration',
         4: 'GP & Community Handoff',
         5: 'Post-Discharge Monitoring',
-        6: 'Outcomes & Governance Analytics'
+        6: 'Outcomes & Governance Analytics',
+        7: 'Transport & Hotel Routing'
       };
       const title = titles[n] || '';
-      return `${p.status} • Step ${n}/6${title ? ' – ' + title : ''}`;
+      return `${p.status} • Step ${n}/7${title ? ' – ' + title : ''}`;
     }
 
     function updateHdStatusForPatient(patientId) {
@@ -2277,7 +2385,7 @@ ASSISTANT:
       if (polEl) polEl.innerHTML = '';
       if (graphEl) graphEl.innerHTML = '';
       if (!p) {
-        selEl.textContent = 'Select a patient to view their 6-step discharge bundle.';
+        selEl.textContent = 'Select a patient to view their 7-step discharge bundle.';
         stepsEl.innerHTML = '';
         return;
       }
@@ -2342,6 +2450,23 @@ ASSISTANT:
           body:
             '<p>This admission will contribute to readmission, adherence and follow-up KPIs aggregated by the Outcomes Agent.</p>' +
             '<div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step6\')">Run Step 6 Agent</button></div>'
+        },
+        {
+          id:'step7',
+          title:'Step 7 • Hospital-to-Hotel Transport & Map',
+          body:
+            '<p>Plan a safe route from the hospital to the nominated hotel, including mode, ETA and an openable map link.</p>' +
+            '<div class="row" style="gap:8px; margin-top:4px; flex-wrap:wrap;">' +
+              '<div style="flex:1; min-width:180px;">' +
+                '<label style="font-size:12px; color:var(--muted);">Hospital name / address</label>' +
+                '<input id="hd_hospital_name" type="text" placeholder="e.g. Royal Adelaide Hospital" />' +
+              '</div>' +
+              '<div style="flex:1; min-width:180px;">' +
+                '<label style="font-size:12px; color:var(--muted);">Hotel name / address</label>' +
+                '<input id="hd_hotel_name" type="text" placeholder="e.g. Stamford Plaza Adelaide" />' +
+              '</div>' +
+            '</div>' +
+            '<div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step7\')">Run Step 7 Agent</button></div>'
         }
       ];
 
@@ -2354,91 +2479,20 @@ ASSISTANT:
       }); 
     }
 
-    function getPromptStudioContext() {
-      const packName = window.__currentPackName || (document.querySelector('#packList button.active')?.dataset.pack) || '';
-      const instrEl = document.getElementById('packInstructions');
-      const polEl = document.getElementById('policyText');
-      const domainSel = document.getElementById('studioDomain');
-      return {
-        pack: packName,
-        domain: domainSel ? domainSel.value : '',
-        instructions: instrEl ? instrEl.value : '',
-        policies_markdown: polEl ? polEl.value : ''
-      };
-    }
-
     async function runHdStep(stepId) {
       const pid = window.__hdSelectedPatientId;
       if (!pid) { showToast('Select a patient in Hospital Discharge panel first.'); return; }
       const p = HD_PATIENTS.find(x => x.patientId === pid);
       if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
       const kind = 'hd_' + stepId;
-
-      // Automatically choose the relevant Prompt Studio pack for this step,
-      // so the correct instructions/policies are always submitted to the LLM
-      // without requiring the user to manually select/submit packs.
-      const baseCtx = getPromptStudioContext();
-      const packPerStep = {
-        step1: 'Hospital – Discharge Readiness & Risk Agent',
-        step2: 'Hospital – Medication Reconciliation Agent',
-        step3: 'Hospital – Follow-Up Orchestration Agent',
-        step4: 'Hospital – GP & Community Handoff Agent',
-        step5: 'Hospital – Post-Discharge Monitoring Agent',
-        step6: 'Hospital – Outcomes & Governance Analytics Agent'
-      };
-      const autoPackName = packPerStep[stepId] || baseCtx.pack || '';
-      const packCfg = autoPackName && PROMPT_PACKS[autoPackName] ? PROMPT_PACKS[autoPackName] : null;
-      const activePackCfg = baseCtx.pack && PROMPT_PACKS[baseCtx.pack] ? PROMPT_PACKS[baseCtx.pack] : null;
-      const activeIsHealth = !!(activePackCfg && activePackCfg.domain === 'health');
-      const studioPolicies = activeIsHealth && baseCtx.policies_markdown
-        ? baseCtx.policies_markdown.trim()
-        : '';
-      const promptCtx = {
-        pack: autoPackName,
-        domain: (packCfg && packCfg.domain) || baseCtx.domain || 'health',
-        // Prefer live Prompt Studio edits only when they correspond to the
-        // same pack; otherwise use the default instructions/policies for the
-        // auto-selected health pack so each step runs correctly without
-        // manual pack selection/submission.
-        instructions:
-          (baseCtx.pack === autoPackName && baseCtx.instructions && baseCtx.instructions.trim()) ||
-          (packCfg && packCfg.instructions) ||
-          '',
-        policies_markdown:
-          studioPolicies ||
-          (packCfg && packCfg.policies) ||
-          ''
-      };
-
-      const basePayload = {
-        step_id: stepId,
-        patient_id: pid,
-        encounter_id: 'ENC' + pid.slice(1),
-        patient: {
-          name: p.name,
-          ward: p.ward,
-          lace: p.lace,
-          laceRisk: p.laceRisk,
-          hosp: p.hosp,
-          hospRisk: p.hospRisk,
-          status: p.status,
-          atsi: p.atsi,
-          ndis: p.ndis
-        },
-        risk: {
-          lace_plus_risk_level: p.laceRisk,
-          hospital_risk_level: p.hospRisk
-        },
-        prompt_pack: promptCtx
-      };
-
-      // Hint to backend about the specific agent/intent for this step
-      if (stepId === 'step1') basePayload.agent = 'discharge_readiness_risk';
+      let basePayload = { patient_id: pid };
+      if (stepId === 'step1') basePayload.agent = 'discharge_readiness';
       else if (stepId === 'step2') basePayload.agent = 'medication_reconciliation';
-      else if (stepId === 'step3') basePayload.agent = 'followup_orchestration';
+      else if (stepId === 'step3') basePayload.agent = 'follow_up_orchestration';
       else if (stepId === 'step4') basePayload.agent = 'gp_community_handoff';
       else if (stepId === 'step5') basePayload.agent = 'post_discharge_monitoring';
       else if (stepId === 'step6') basePayload.agent = 'outcomes_analytics';
+      else if (stepId === 'step7') basePayload.agent = 'hospital_to_hotel_transport';
 
       const data = await runHealthAgent(kind, basePayload, { append: !!window.__appendMode });
 
@@ -3106,6 +3160,44 @@ ASSISTANT:
             intro = `The Outcomes & Governance Analytics agent has updated cohort metrics for patient <code>${pid}</code> over <strong>${start}</strong> to <strong>${period.end_date || ''}</strong>. ` +
                     `It summarises readmission, follow-up completion, medication reconciliation, and length-of-stay performance for this discharge program.` +
                     kpiHtml;
+          } else if (kind === 'hd_step7') {
+            const pidLabel = pid;
+            const hospLoc = res.hospital_location || data.hospital_location || '';
+            const hotelLoc = res.hotel_location || data.hotel_location || '';
+            const primary = res.primary_route || {};
+            const fallback = res.fallback_route || {};
+
+            function routeLine(r, label) {
+              if (!r || typeof r !== 'object') return '';
+              const mode = r.mode || 'ROUTE';
+              const dist = (r.distance_km !== undefined && r.distance_km !== null) ? `${r.distance_km} km` : '';
+              const eta = (r.eta_minutes !== undefined && r.eta_minutes !== null) ? `${r.eta_minutes} min` : '';
+              const notes = r.notes || '';
+              const bits = [mode];
+              if (dist) bits.push(dist);
+              if (eta) bits.push(eta);
+              let line = `• <strong>${label}</strong>: ${bits.join(' · ')}`;
+              if (notes) {
+                line += `<br/>&nbsp;&nbsp;<span style="color:#6b7280; font-size:12px;">${notes}</span>`;
+              }
+              if (r.map_url) {
+                line += `<br/>&nbsp;&nbsp;<a href="${r.map_url}" target="_blank" rel="noopener noreferrer">Open map</a>`;
+              }
+              return line;
+            }
+
+            const primaryLine = routeLine(primary, 'Primary route');
+            const fallbackLine = routeLine(fallback, 'Fallback route');
+            const routesHtml = [primaryLine, fallbackLine].filter(Boolean).join('<br/>');
+
+            let locLine = '';
+            if (hospLoc || hotelLoc) {
+              locLine = `<p><strong>Locations:</strong> ${hospLoc ? 'Hospital – ' + hospLoc : ''}${hospLoc && hotelLoc ? ' → ' : ''}${hotelLoc ? 'Hotel – ' + hotelLoc : ''}</p>`;
+            }
+
+            intro = `The Transport & Hotel Routing agent has proposed a safe route for patient <code>${pidLabel}</code> from hospital to their hotel.` +
+                    locLine +
+                    (routesHtml ? `<p><strong>Suggested routes:</strong><br/>${routesHtml}</p>` : '');
           }
 
           return `<p>${intro}</p>`;
