@@ -54,6 +54,10 @@ def make_maps_client() -> MCPClient:
 
     The underlying command is configurable via MCP_MAPS_CMD so that
     different environments can point to real or mock Maps MCP servers.
+    If MCP_MAPS_CMD is not set, this function raises RuntimeError so
+    callers can fall back gracefully.
     """
-    cmd = os.getenv("MCP_MAPS_CMD", "python3 mcp/mcp-maps/main.py")
+    cmd = os.getenv("MCP_MAPS_CMD")
+    if not cmd:
+        raise RuntimeError("MCP_MAPS_CMD is not configured for Maps MCP")
     return MCPClient(cmd)

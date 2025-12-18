@@ -1225,8 +1225,10 @@ def demo_hd_step7(req: HdStepRequest):
             # show a capture without disturbing existing step fields.
             base["transport_map"] = route
         except Exception:
-            # If Maps MCP is unavailable or misconfigured, still return
-            # the LLM step output so the demo UI continues to work.
+            # If Maps MCP is unavailable or misconfigured (e.g.
+            # MCP_MAPS_CMD not set), still return the LLM step output so
+            # the demo UI continues to work. A fallback transport_map
+            # may still be populated from the LLM JSON below.
             pass
 
     # Fallback: if no transport_map was attached (e.g. Maps MCP is not
@@ -1258,10 +1260,11 @@ def demo_hd_step7(req: HdStepRequest):
                     summary_bits.append(f"{src['distance_km']} km")
                 if src.get("eta_minutes") is not None:
                     summary_bits.append(f"{src['eta_minutes']} min")
-                summary = "  b7 ".join(summary_bits)
+                # Use a simple bullet separator between summary fragments.
+                summary = " • ".join(summary_bits)
                 if src.get("notes"):
                     if summary:
-                        summary += "  b7 " + str(src["notes"])
+                        summary += " • " + str(src["notes"])
                     else:
                         summary = str(src["notes"])
                 return {
