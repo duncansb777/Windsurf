@@ -1170,20 +1170,20 @@ ASSISTANT:
     }
   ]
 }`,
-            policies: `- Do not modify booking systems directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up, and ensure an appropriate mental-health/community follow-up exists when indicated.\n- Ensure every discharged patient has a GP follow-up with their own GP (from EMR GP information) unless the context clearly shows this is not required or appropriate, and document that reasoning.\n- Respect genuinely low-risk cases where no specialist follow-up beyond routine GP review is needed.\n- Prefer simple, patient-friendly language when describing follow-up plans.`,
-            examples: [
-              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-            ],
-            context_hint: 'Uses EMR/PAS CSVs for discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory.',
-            context_preview: 'Discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory from CSVs.'
-          },
-          'Hospital – GP & Community Handoff Agent': {
-            domain: 'health',
-            title: 'Hospital – GP & Community Handoff Agent',
-            desc: 'LLM prompt for the GP & Community Handoff Agent.',
-            affects: 'gp_community_handoff_agent',
-            instructions: `SYSTEM:
+        policies: `- Do not modify booking systems directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up, and ensure an appropriate mental-health/community follow-up exists when indicated.\n- Ensure every discharged patient has a GP follow-up with their own GP (from EMR GP information) unless the context clearly shows this is not required or appropriate, and document that reasoning.\n- Respect genuinely low-risk cases where no specialist follow-up beyond routine GP review is needed.\n- Prefer simple, patient-friendly language when describing follow-up plans.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses EMR/PAS CSVs for discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory.',
+        context_preview: 'Discharge diagnoses, procedures, risk band, follow-up rules, scheduled appointments and GP/specialist directory from CSVs.'
+      },
+      'Hospital – GP & Community Handoff Agent': {
+        domain: 'health',
+        title: 'Hospital – GP & Community Handoff Agent',
+        desc: 'LLM prompt for the GP & Community Handoff Agent.',
+        affects: 'gp_community_handoff_agent',
+        instructions: `SYSTEM:
 You are the GP & Community Handoff Agent.
 Your tasks:
 1) Summarise the hospital stay in a GP-friendly way.
@@ -1239,20 +1239,20 @@ ASSISTANT:
     }
   ]
 }`,
-            policies: `- Do not modify GP/community services directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) so that GP and community action items explicitly address those risks.\n- Ensure gp_handoff.summary_bullets and gp_action_items are populated for every discharge handover, not left empty.\n- Prefer simple, GP-friendly and patient-friendly language in summaries and recommendations.`,
-            examples: [
-              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-            ],
-            context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
-            context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
-          },
-          'Hospital – Post-Discharge Monitoring Agent': {
-            domain: 'health',
-            title: 'Hospital – Post-Discharge Monitoring Agent',
-            desc: 'LLM prompt for the Post-Discharge Monitoring Agent.',
-            affects: 'post_discharge_monitoring_agent',
-            instructions: `SYSTEM:
+        policies: `- Do not modify GP/community services directly; only recommend changes and explain the rationale.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) so that GP and community action items explicitly address those risks.\n- Ensure gp_handoff.summary_bullets and gp_action_items are populated for every discharge handover, not left empty.\n- Prefer simple, GP-friendly and patient-friendly language in summaries and recommendations.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses EMR/PAS CSVs for core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data.',
+        context_preview: 'Core clinical summary, discharge medication summary, follow-up plan, risk band, GP and community services data from CSVs.'
+      },
+      'Hospital – Post-Discharge Monitoring Agent': {
+        domain: 'health',
+        title: 'Hospital – Post-Discharge Monitoring Agent',
+        desc: 'LLM prompt for the Post-Discharge Monitoring Agent.',
+        affects: 'post_discharge_monitoring_agent',
+        instructions: `SYSTEM:
 You are the Post-Discharge Monitoring Agent.
 You work with a digital avatar channel to:
 1) Run scheduled check-ins with patients.
@@ -1305,20 +1305,20 @@ ASSISTANT:
     }
   ]
 }`,
-            policies: `- Do not override clinicians; only propose alerts and suggested actions.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
-            examples: [
-              { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
-              { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
-            ],
-            context_hint: 'Uses POST_DISCHARGE_MONITORING_PLAN, AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA and risk agent output.',
-            context_preview: 'Monitoring plan, recent avatar interactions, clinical risk band from CSVs.'
-          },
-          'Hospital – Transport & Hotel Routing Agent': {
-            domain: 'health',
-            title: 'Hospital – Transport & Hotel Routing Agent',
-            desc: 'LLM prompt for planning safe transport and hotel routing after discharge.',
-            affects: 'hospital_to_hotel_transport_agent',
-            instructions: `SYSTEM:
+        policies: `- Do not override clinicians; only propose alerts and suggested actions.\n- Always flag high-risk patients (e.g., suicide risk, complex comorbidities) for explicit follow-up.\n- Prefer simple, patient-friendly language in recommendations.`,
+        examples: [
+          { scenario:'Suicide risk patient with no safety plan', status:'Flags high-risk and recommends urgent GP follow-up', last_run:'Today' },
+          { scenario:'Routine post-discharge GP follow-up', status:'Scheduled for 3–5 days post-discharge', last_run:'Today' }
+        ],
+        context_hint: 'Uses POST_DISCHARGE_MONITORING_PLAN, AVATAR_CHECK_IN_SCHEDULE, PATIENT_REPORTED_DATA and risk agent output.',
+        context_preview: 'Monitoring plan, recent avatar interactions, clinical risk band from CSVs.'
+      },
+      'Hospital – Transport & Hotel Routing Agent': {
+        domain: 'health',
+        title: 'Hospital – Transport & Hotel Routing Agent',
+        desc: 'LLM prompt for planning safe transport and hotel routing after discharge.',
+        affects: 'hospital_to_hotel_transport_agent',
+        instructions: `SYSTEM:
 You are the Hospital to Hotel Transport & Routing Agent.
 Your job is to plan a safe route from the discharging hospital to a nominated hotel for the patient, using provided address and transport constraints.
 You DO NOT actually book transport. You:
@@ -1360,22 +1360,30 @@ ASSISTANT:
     "notes": "<short notes on when to prefer this route>"
   }
 }`,
-            policies: `- Do not actually book transport; only recommend routes and modes.
+        policies: `- Do not actually book transport; only recommend routes and modes.
 - Prefer safer options for higher-risk or mobility-limited patients (e.g., dedicated wheelchair transport over multi-leg public transport).
 - Keep explanations short and suitable for both clinicians and patients.`,
-            examples: [
-              { scenario:'Elderly patient needing wheelchair transport to nearby hotel', status:'Recommends wheelchair transport with short, step-free route', last_run:'Today' },
-              { scenario:'Low-risk patient going home via taxi', status:'Suggests standard taxi route plus public transport fallback', last_run:'Today' }
-            ],
-            context_hint: 'Uses hospital and hotel locations plus mobility constraints to recommend routes and map URLs.',
-            context_preview: 'Hospital address, hotel address, and mobility constraints used to generate primary and fallback routes.'
+        examples: [
+          {
+            scenario: 'Elderly patient needing wheelchair transport to nearby hotel',
+            status: 'Recommends wheelchair transport with short, step-free route',
+            last_run: 'Today'
           },
-          'Hospital – Outcomes & Governance Analytics Agent': {
-            domain: 'health',
-            title: 'Hospital – Outcomes & Governance Analytics Agent',
-            desc: 'LLM prompt for the Outcomes & Governance Analytics Agent.',
-            affects: 'discharge_outcomes_analytics_agent',
-            instructions: `SYSTEM:
+          {
+            scenario: 'Low-risk patient going home via taxi',
+            status: 'Suggests standard taxi route plus public transport fallback',
+            last_run: 'Today'
+          }
+        ],
+        context_hint: 'Uses hospital and hotel locations plus mobility constraints to recommend routes and map URLs.',
+        context_preview: 'Hospital address, hotel address, and mobility constraints used to generate primary and fallback routes.'
+      },
+      'Hospital – Outcomes & Governance Analytics Agent': {
+        domain: 'health',
+        title: 'Hospital – Outcomes & Governance Analytics Agent',
+        desc: 'LLM prompt for the Outcomes & Governance Analytics Agent.',
+        affects: 'outcomes_governance_analytics_agent',
+        instructions: `SYSTEM:
 You are the Outcomes & Governance Analytics Agent.
 You aggregate discharge pathway performance for clinical governance and business value tracking.
 
@@ -1423,14 +1431,14 @@ ASSISTANT:
     "<insight 3>"
   ]
 }`,
-            policies: `- Report KPIs honestly, without hiding poor performance.\n- Break down outcomes by risk band and bundle adherence.\n- Highlight actionable trends rather than trivial correlations.`,
-            examples: [
-              { scenario:'HIGH risk patients without GP ≤7 days', status:'Flags higher readmission rate', last_run:'Today' }
-            ],
-            context_hint: 'Aggregates OUTCOME_TRACKING, PERFORMANCE_METRICS and improvement logs.',
-            context_preview: '30-day readmissions, GP follow-up, med recon completion and LOS vs baseline, sliced by risk band.'
-          }
-        };
+              policies: `- Report KPIs honestly, without hiding poor performance.\n- Break down outcomes by risk band and bundle adherence.\n- Highlight actionable trends rather than trivial correlations.`,
+              examples: [
+                { scenario:'HIGH risk patients without GP ≤7 days', status:'Flags higher readmission rate', last_run:'Today' }
+              ],
+              context_hint: 'Aggregates OUTCOME_TRACKING, PERFORMANCE_METRICS and improvement logs.',
+              context_preview: '30-day readmissions, GP follow-up, med recon completion and LOS vs baseline, sliced by risk band.'
+            }
+          };
 
     function initPromptStudio() {
       const domainSel = document.getElementById('studioDomain');
@@ -1521,9 +1529,7 @@ ASSISTANT:
       document.getElementById(id).classList.add('active');
       buttons.forEach(b => b.classList.toggle('active', b.dataset.view === id));
       window.scrollTo({ top: 0, behavior: 'instant' });
-      // When opening the Health Agents view, push all configured prompt packs
-      // to the backend so the live LLM sees the latest instructions/policies.
-      if (id === 'agent') {
+      if (id === 'agent' || id === 'healthAgents') {
         pushAllPromptPacks();
         renderAgentUsage();
       }
@@ -2479,13 +2485,40 @@ ASSISTANT:
       }); 
     }
 
+    function getPromptPackForHdStep(stepId) {
+      if (stepId === 'step1') return 'Hospital – Discharge Readiness & Risk Agent';
+      if (stepId === 'step2') return 'Hospital – Medication Reconciliation Agent';
+      if (stepId === 'step3') return 'Hospital – Follow-Up Orchestration Agent';
+      if (stepId === 'step4') return 'Hospital – GP & Community Handoff Agent';
+      if (stepId === 'step5') return 'Hospital – Post-Discharge Monitoring Agent';
+      if (stepId === 'step6') return 'Hospital – Outcomes & Governance Analytics Agent';
+      if (stepId === 'step7') return 'Hospital – Transport & Hotel Routing Agent';
+      return null;
+    }
+
     async function runHdStep(stepId) {
       const pid = window.__hdSelectedPatientId;
       if (!pid) { showToast('Select a patient in Hospital Discharge panel first.'); return; }
       const p = HD_PATIENTS.find(x => x.patientId === pid);
       if (!p) { showToast('Patient not found in Hospital Discharge dataset.'); return; }
       const kind = 'hd_' + stepId;
-      let basePayload = { step_id: stepId, patient_id: pid };
+      const packName = getPromptPackForHdStep(stepId);
+      const cfg = packName && PROMPT_PACKS ? (PROMPT_PACKS[packName] || {}) : {};
+      promptCtx = {
+        pack: packName || '',
+        domain: cfg.domain || 'health',
+        instructions: cfg.instructions || '',
+        policies_markdown: cfg.policies || ''
+      };
+
+      let basePayload = {
+        step_id: stepId,
+        patient_id: pid,
+        prompt_pack: {
+          instructions: promptCtx.instructions || '',
+          policies_markdown: promptCtx.policies_markdown || ''
+        }
+      };
       if (stepId === 'step1') basePayload.agent = 'discharge_readiness';
       else if (stepId === 'step2') basePayload.agent = 'medication_reconciliation';
       else if (stepId === 'step3') basePayload.agent = 'follow_up_orchestration';

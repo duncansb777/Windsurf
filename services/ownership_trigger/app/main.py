@@ -7,9 +7,9 @@ import time
 import json
 import random
 from typing import Optional, List
-from .ccs_tools import ccs_get_meter_reads
-from .agentis_demo import run_demo as agentis_run_demo
-from .agentis_demo import run_referral_demo as agentis_run_referral
+from ccs_tools import ccs_get_meter_reads
+from agentis_demo import run_demo as agentis_run_demo
+from agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
 from libs.agentis.llm_client import LLMClient
 from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client
@@ -536,16 +536,41 @@ def _run_hd_step(req: HdStepRequest, step: str) -> dict:
         if not body:
             body = {"raw_text": out.get("text", ""), "model": out.get("model")}
 
+        # Derive summary fields from nested risk_assessment if the model did not
+        # populate overall_risk_band / recommended_bundle at the top level. This
+        # lets us reuse existing prompt packs while still surfacing concise
+        # risk outputs to the UI.
+        overall_band = body.get("overall_risk_band") or ctx["risk"].get("overall_risk_band") or ctx["risk"].get("lace_plus_risk_level")
+        if not overall_band:
+            try:
+                ra = body.get("risk_assessment") or {}
+                lace = (ra.get("lace_plus_score") or {}).get("risk_level")
+                hosp = (ra.get("hospital_score") or {}).get("risk_level")
+                overall_band = lace or hosp or None
+            except Exception:
+                overall_band = None
+
+        recommended_bundle = body.get("recommended_bundle")
+        if recommended_bundle is None:
+            # Fall back to a simple bundle label based on the derived risk band.
+            band_upper = (overall_band or "").upper()
+            if band_upper == "HIGH":
+                recommended_bundle = "High-intensity discharge bundle"
+            elif band_upper in {"INTERMEDIATE", "MEDIUM"}:
+                recommended_bundle = "Standard discharge bundle"
+            elif band_upper == "LOW":
+                recommended_bundle = "Light-touch discharge bundle"
+
         data: dict = {
             "patient_id": req.patient_id or pid,
             "agent": req.agent or "discharge_readiness_risk",
-            "overall_risk_band": body.get("overall_risk_band") or ctx["risk"].get("overall_risk_band") or ctx["risk"].get("lace_plus_risk_level"),
-            "recommended_bundle": body.get("recommended_bundle"),
+            "overall_risk_band": overall_band,
+            "recommended_bundle": recommended_bundle,
             "risk_factors": body.get("risk_factors") or [],
             "flags": body.get("flags") or [],
             "llm_reasoning": body.get("llm_reasoning")
             or [
-                f"LLM classified discharge readiness risk as {body.get('overall_risk_band') or 'UNKNOWN'} based on LACE+, HOSPITAL, and policy context.",
+                f"LLM classified discharge readiness risk as {overall_band or 'UNKNOWN'} based on LACE+, HOSPITAL, and policy context.",
             ],
             "plan_raw": body,
         }
