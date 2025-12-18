@@ -184,7 +184,7 @@
         <h3>Billing Agents</h3>
         <table>
           <thead>
-            <tr><th>Agent</th><th>Status</th><th>Autonomy</th><th>Current Tasks</th><th></th></tr>
+            <tr><th>Agent</th><th>Status</th><th>Autonomy</th><th>Current Tasks</th><th>Usage (runs)</th><th></th></tr>
           </thead>
           <tbody>
             <tr>
@@ -192,6 +192,7 @@
               <td><span class="pill ok">Healthy</span></td>
               <td>2</td>
               <td>38</td>
+              <td data-usage-agent="Balance Transfer Agent">0 runs</td>
               <td class="row" style="gap:6px;">
                 <button class="btn" onclick="goToAgent('Balance Transfer Agent')">View</button>
                 <button class="btn" onclick="executeAgent('Balance Transfer Agent')">Run</button>
@@ -203,6 +204,7 @@
               <td><span class="pill warn">Degraded</span></td>
               <td>1</td>
               <td>22</td>
+              <td data-usage-agent="Ownership Trigger Agent">0 runs</td>
               <td class="row" style="gap:6px;">
                 <button class="btn" onclick="goToAgent('Ownership Trigger Agent')">View</button>
                 <button class="btn" onclick="executeAgent('Ownership Trigger Agent')">Run</button>
@@ -214,6 +216,7 @@
               <td><span class="pill">Paused</span></td>
               <td>0</td>
               <td>0</td>
+              <td data-usage-agent="Special Read Scheduler Agent">0 runs</td>
               <td class="row" style="gap:6px;">
                 <button class="btn" onclick="goToAgent('Special Read Scheduler Agent')">View</button>
                 <button class="btn" onclick="executeAgent('Special Read Scheduler Agent')">Run</button>
@@ -1457,10 +1460,51 @@ ASSISTANT:
       // to the backend so the live LLM sees the latest instructions/policies.
       if (id === 'agent') {
         pushAllPromptPacks();
+        renderAgentUsage();
+      }
+      if (id === 'fleet') {
+        renderAgentUsage();
       }
     }
 
     buttons.forEach(b => b.addEventListener('click', () => goToView(b.dataset.view)));
+
+    // Simple per-agent usage tracking for Fleet/Billing view
+    const USAGE_STORAGE_KEY = 'agent_usage_counts_v1';
+    function loadAgentUsage() {
+      try {
+        const raw = window.localStorage.getItem(USAGE_STORAGE_KEY);
+        return raw ? JSON.parse(raw) || {} : {};
+      } catch (e) {
+        return {};
+      }
+    }
+    function saveAgentUsage(map) {
+      try {
+        window.localStorage.setItem(USAGE_STORAGE_KEY, JSON.stringify(map || {}));
+      } catch (e) {}
+    }
+    function renderAgentUsage() {
+      const usage = loadAgentUsage();
+      const cells = document.querySelectorAll('[data-usage-agent]');
+      cells.forEach(cell => {
+        const name = cell.getAttribute('data-usage-agent');
+        const count = usage[name] || 0;
+        cell.textContent = count + (count === 1 ? ' run' : ' runs');
+      });
+    }
+    function incrementAgentUsage(name) {
+      if (!name) return;
+      const usage = loadAgentUsage();
+      usage[name] = (usage[name] || 0) + 1;
+      saveAgentUsage(usage);
+      renderAgentUsage();
+    }
+
+    // Initialise usage display on first load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderAgentUsage();
+    });
 
     // Agent execution helpers
     function val(id){ const el=document.getElementById(id); return el? (el.value||'').trim() : ''; }
@@ -1480,6 +1524,7 @@ ASSISTANT:
         const res = await fetch(url, { method: 'POST' });
         if (res.ok) {
           showToast('Started: ' + name);
+          incrementAgentUsage(name);
         } else {
           showToast('Failed to start ' + name + ' (HTTP ' + res.status + ')');
         }

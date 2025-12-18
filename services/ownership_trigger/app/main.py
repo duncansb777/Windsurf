@@ -7,9 +7,9 @@ import time
 import json
 import random
 from typing import Optional, List
-from .ccs_tools import ccs_get_meter_reads
-from .agentis_demo import run_demo as agentis_run_demo
-from .agentis_demo import run_referral_demo as agentis_run_referral
+from ccs_tools import ccs_get_meter_reads
+from agentis_demo import run_demo as agentis_run_demo
+from agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
 from libs.agentis.llm_client import LLMClient
 from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client

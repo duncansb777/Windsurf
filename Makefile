@@ -24,7 +24,7 @@ mcp-hca:
 .PHONY: run-ui
 
 run-ownership-trigger:
-	PYTHONPATH=$$(pwd) uvicorn --app-dir services/ownership-trigger/app main:app --reload --port 8001
+	PYTHONPATH=$$(pwd) uvicorn --app-dir services/ownership_trigger/app main:app --reload --port 8001
 
 run-demo-ui:
 	PYTHONPATH=$$(pwd) uvicorn --app-dir services/demo-ui/app main:app --reload --port 8000
@@ -32,7 +32,7 @@ run-demo-ui:
 run-ui:
 	# Start Ownership Trigger backend (MCP-backed) and open the HTML UI in the default browser.
 	# Backend runs in the foreground here; stop with Ctrl+C when done.
-	PYTHONPATH=$$(pwd) uvicorn --app-dir services/ownership-trigger/app main:app --reload --port 8001 & \
+	PYTHONPATH=$$(pwd) uvicorn --app-dir services/ownership_trigger/app main:app --reload --port 8001 & \
 	  sleep 2 && open ./agentic-control-demo.html; \
 	  wait
 
