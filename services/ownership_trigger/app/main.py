@@ -12,7 +12,7 @@ from agentis_demo import run_demo as agentis_run_demo
 from agentis_demo import run_referral_demo as agentis_run_referral
 from libs.agentis.tools.policy import check_consent
 from libs.agentis.llm_client import LLMClient
-from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client
+from libs.common.mcp_client import make_epic_client, make_hca_client, make_coo_client, make_maps_client
 
 app = FastAPI(title="Ownership Trigger Agent")
 app.add_middleware(
@@ -337,6 +337,9 @@ class HdStepRequest(BaseModel):
     risk: dict = {}
     prompt_pack: dict = {}
     agent: Optional[str] = None
+    # Optional addresses for transport / mapping steps (e.g. step7)
+    hospital_address: Optional[str] = None
+    hotel_address: Optional[str] = None
 
 
 def _run_hd_step(req: HdStepRequest, step: str) -> dict:
@@ -1200,7 +1203,33 @@ def demo_hd_step7(req: HdStepRequest):
     Reuses the generic _run_hd_step helper so the LLM prompt + schema
     come from the same discharge pipeline as steps 1–6.
     """
-    return _run_hd_step(req, "step7")
+    base = _run_hd_step(req, "step7")
+
+    # Best-effort integration with a Google Maps MCP server. This expects
+    # an MCP server command configured via MCP_MAPS_CMD and a tool
+    # (for example "maps.route_with_static_map") that returns a JSON
+    # structure including a static map image URL.
+    origin = req.hospital_address or ""
+    destination = req.hotel_address or ""
+    if origin and destination:
+        try:
+            maps = make_maps_client()
+            route = maps.call(
+                "maps.route_with_static_map",
+                {
+                    "origin": origin,
+                    "destination": destination,
+                },
+            )
+            # Attach map metadata under a dedicated key so the UI can
+            # show a capture without disturbing existing step fields.
+            base["transport_map"] = route
+        except Exception:
+            # If Maps MCP is unavailable or misconfigured, still return
+            # the LLM step output so the demo UI continues to work.
+            pass
+
+    return base
 
 
 class ConsentCheckRequest(BaseModel):

@@ -2472,6 +2472,7 @@ ASSISTANT:
                 '<input id="hd_hotel_name" type="text" placeholder="e.g. Stamford Plaza Adelaide" />' +
               '</div>' +
             '</div>' +
+            '<div id="hd_step7_map" style="margin-top:8px;"></div>' +
             '<div class="row" style="justify-content:flex-end; margin-top:6px;"><button class="btn" onclick="runHdStep(\'step7\')">Run Step 7 Agent</button></div>'
         }
       ];
@@ -2527,6 +2528,17 @@ ASSISTANT:
       else if (stepId === 'step6') basePayload.agent = 'outcomes_analytics';
       else if (stepId === 'step7') basePayload.agent = 'hospital_to_hotel_transport';
 
+      // For the transport/map step, pass through any user-specified
+      // hospital/hotel addresses so the backend can call Maps MCP.
+      if (stepId === 'step7') {
+        try {
+          const hospEl = document.getElementById('hd_hospital_name');
+          const hotelEl = document.getElementById('hd_hotel_name');
+          if (hospEl && hospEl.value) basePayload.hospital_address = hospEl.value;
+          if (hotelEl && hotelEl.value) basePayload.hotel_address = hotelEl.value;
+        } catch (e) {}
+      }
+
       const data = await runHealthAgent(kind, basePayload, { append: !!window.__appendMode });
 
       // For step 3, surface the follow-up booking flow so a user can
@@ -2534,6 +2546,14 @@ ASSISTANT:
       if (stepId === 'step3' && data) {
         try {
           openFollowupBookingModal(pid, data);
+        } catch (e) {}
+      }
+
+      // For step 7, render any transport_map payload returned by the
+      // backend (e.g., static map image or link from Google Maps MCP).
+      if (stepId === 'step7' && data) {
+        try {
+          renderHdStep7Map(data);
         } catch (e) {}
       }
 
@@ -2617,7 +2637,9 @@ ASSISTANT:
         return String(s)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
 
       let html = '';
@@ -2673,6 +2695,34 @@ ASSISTANT:
         html = '<p style="color:#6b7280;">Run a Hospital Discharge step to see the active policies and raw LLM output used for that run.</p>';
       }
       bodyEl.innerHTML = html;
+    }
+
+    function renderHdStep7Map(data) {
+      const container = document.getElementById('hd_step7_map');
+      if (!container) return;
+      const tm = (data && (data.transport_map || (data.result && data.result.transport_map))) || null;
+      if (!tm) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const imgUrl = tm.static_map_url || tm.image_url || '';
+      const mapLink = tm.map_url || tm.link || '';
+      const summary = tm.summary || '';
+
+      let html = '<div class="card" style="padding:8px;">';
+      html += '<div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Transport map (Google Maps MCP)</div>';
+      if (imgUrl) {
+        html += '<img src="' + imgUrl + '" alt="Hospital-to-hotel route map" style="max-width:100%; border-radius:8px; border:1px solid var(--border);" />';
+      }
+      if (summary) {
+        html += '<div style="margin-top:4px; font-size:12px;">' + summary + '</div>';
+      }
+      if (mapLink) {
+        html += '<div style="margin-top:4px;"><a href="' + mapLink + '" target="_blank" rel="noopener" class="link-cell">Open in Google Maps</a></div>';
+      }
+      html += '</div>';
+      container.innerHTML = html;
     }
 
     function openQuickRun() {

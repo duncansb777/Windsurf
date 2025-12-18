@@ -47,3 +47,13 @@ def make_hca_client() -> MCPClient:
 def make_coo_client() -> MCPClient:
     cmd = os.getenv("MCP_COO_CMD", "python3 mcp/mcp-coo-mock/main.py")
     return MCPClient(cmd)
+
+
+def make_maps_client() -> MCPClient:
+    """Create an MCP client for Google Maps / routing tools.
+
+    The underlying command is configurable via MCP_MAPS_CMD so that
+    different environments can point to real or mock Maps MCP servers.
+    """
+    cmd = os.getenv("MCP_MAPS_CMD", "python3 mcp/mcp-maps/main.py")
+    return MCPClient(cmd)
